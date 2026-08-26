@@ -626,7 +626,9 @@ body.has-player #screenKid { padding-bottom: 150px; }
 
 .p-btns { flex: 0 0 auto; display: flex; align-items: center; }
 .p-btn {
-  width: 44px; height: 44px;
+  /* 66 statt 44: Fuer Kinderhaende war der Knopf zu klein, danebentippen
+     kostete einen Anlauf. .big und .fav ueberschreiben das weiter unten. */
+  width: 66px; height: 66px;
   border: 0;
   padding: 0;
   background: transparent;
@@ -645,6 +647,14 @@ body.has-player #screenKid { padding-bottom: 150px; }
 .p-btn.fav.on { color: var(--fav); }
 .p-btn.fav:empty { cursor: default; }
 .p-btn svg { display: block; margin: 0 auto; }
+/* Sofortige Rueckmeldung, noch vor jedem Netzwerkverkehr. Ohne sie wirkte ein
+   Tipp folgenlos: Das Kind tippte nach, weil nichts passierte, und sprang
+   dadurch mehrere Titel weit. Dieselbe Geste wie bei den PIN-Tasten. */
+.p-btn:active { transform: scale(0.94); }
+/* Solange ein Sprung laeuft, sind Vor/Zurueck gedaempft und taub. Weitere
+   Tipps werden VERWORFEN, nicht gesammelt - gesammelte waeren genau das
+   Ueberspringen, das behoben werden soll. */
+.p-btn.is-busy { opacity: 0.45; }
 
 /* Fortschrittszeile: verstrichene Zeit, Balken, Restzeit. */
 .p-prog { display: flex; align-items: center; }
@@ -1170,7 +1180,7 @@ body.has-player #screenKid { padding-bottom: 150px; }
            auch bei Hoerspielen reserviert, sonst wandern die Knoepfe. -->
       <button class="p-btn fav" id="pFav" title="Lieblingssong"></button>
       <button class="p-btn" id="pPrev" title="Vorheriger">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+        <svg width="33" height="33" viewBox="0 0 24 24" fill="currentColor">
           <path d="M7 6h2v12H7z"/><path d="M19 6v12l-9-6z"/>
         </svg>
       </button>
@@ -1181,7 +1191,7 @@ body.has-player #screenKid { padding-bottom: 150px; }
         </svg>
       </button>
       <button class="p-btn" id="pNext" title="Nächster">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+        <svg width="33" height="33" viewBox="0 0 24 24" fill="currentColor">
           <path d="M15 6h2v12h-2z"/><path d="M5 6v12l9-6z"/>
         </svg>
       </button>
@@ -3674,6 +3684,7 @@ var Bar = (function () {
   var timer = null;
   var last = null;
   var tick = null, posMs = 0, durMs = 0, running = false;
+  var busy = false, busySafety = null;   // laeuft gerade ein Sprung?
 
   /* Die Abfrage läuft nur alle 5 s. Ohne eigenen Takt stünde der Balken
      dazwischen still und die Sekundenanzeige spränge in 5er-Schritten. Bei
@@ -3867,8 +3878,71 @@ var Bar = (function () {
     return state;
   }
 
+  function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+
+  /* Waehrend ein Sprung laeuft, sind Vor/Zurueck sichtbar gedaempft und taub.
+     Grund: Die Leiste haengt der Wiedergabe um bis zu fuenf Sekunden hinterher.
+     Ohne Sperre tippt ein Kind nach, weil nichts passiert - und landet mehrere
+     Titel zu weit. Weitere Tipps werden verworfen, nicht gesammelt. */
+  function setBusy(on) {
+    busy = on;
+    var ids = ["pPrev", "pNext"];
+    for (var i = 0; i < ids.length; i++) {
+      var el = $(ids[i]);
+      if (el) el.className = on ? "p-btn is-busy" : "p-btn";
+    }
+  }
+
+  /* Eine einzelne Nachfrage nach 700 ms war zu frueh: Hatte Spotify den Sprung
+     noch nicht vollzogen, kam der ALTE Titel zurueck - und stand dann bis zum
+     naechsten 5-s-Takt fest. Deshalb mehrfach kurz nachfassen und aufhoeren,
+     sobald sich der Titel wirklich geaendert hat. */
+  async function confirmChange(beforeUri) {
+    var waits = [400, 500, 700, 900];
+    for (var i = 0; i < waits.length; i++) {
+      await wait(waits[i]);
+      var st = await once();
+      var uri = st && st.item && st.item.uri;
+      if (uri && uri !== beforeUri) return true;
+    }
+    Log.warn("Sprung nicht bestaetigt - die Anzeige zieht beim naechsten Takt nach.");
+    return false;
+  }
+
+  /* Am Anfang bzw. Ende einer Liste antwortet Spotify mit 403 und
+     reason NO_PREV_TRACK / NO_NEXT_TRACK. Das ist kein Fehler, sondern
+     "da ist nichts mehr" - und gehoert nicht auf den Fehlerbildschirm, schon
+     gar nicht, waehrend die Musik unveraendert weiterlaeuft.
+     Geprueft wird `reason`, NICHT der Status: Ein 403 heisst auch
+     "kein Premium", und der muss weiterhin gemeldet werden. */
+  async function transport(path, richtung) {
+    if (busy) { Log.info("Tipp verworfen, " + richtung + " laeuft noch."); return; }
+    var before = last && last.item && last.item.uri;
+    setBusy(true);
+    // Sicherheitsnetz wie bei setCover: Bleibt eine Antwort ganz aus, darf der
+    // Knopf nicht dauerhaft taub bleiben.
+    busySafety = setTimeout(function () { setBusy(false); }, 4000);
+    try {
+      try {
+        await Api.post(path);
+      } catch (e) {
+        var reason = e && e.body && e.body.error && e.body.error.reason;
+        if (reason === "NO_PREV_TRACK" || reason === "NO_NEXT_TRACK") {
+          Log.info("Kein Titel " + richtung + " - nichts zu tun (" + reason + ").");
+          return;
+        }
+        throw e;
+      }
+      await confirmChange(before);
+    } finally {
+      if (busySafety) { clearTimeout(busySafety); busySafety = null; }
+      setBusy(false);
+    }
+  }
+
   return {
     state: function () { return last; },
+    isBusy: function () { return busy; },      // fuer den Pruefstand
     now: once,
     setCover: setCover,          // fuer den Pruefstand erreichbar
     refreshFav: function () { paintFav(last); },
@@ -3894,8 +3968,8 @@ var Bar = (function () {
       else await Player.resumeHere();
       setTimeout(once, 400);
     },
-    async next() { await Api.post("/v1/me/player/next"); setTimeout(once, 700); },
-    async prev() { await Api.post("/v1/me/player/previous"); setTimeout(once, 700); }
+    async next() { await transport("/v1/me/player/next", "vorwaerts"); },
+    async prev() { await transport("/v1/me/player/previous", "rueckwaerts"); }
   };
 })();
 
@@ -5159,7 +5233,7 @@ async function copyLog(statusId) {
    Zahl an, die nichts mehr bedeutet – und genau dafür ist sie da: erkennen,
    ob nach einem Push schon der neue Stand geladen ist. Ablesen mit
    `git rev-list --count HEAD` (+1 für den Commit, der gerade entsteht). */
-var APP_VERSION = "v23";
+var APP_VERSION = "v24";
 
 async function boot() {
   var vb = $("verBadge");
