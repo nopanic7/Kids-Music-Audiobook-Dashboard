@@ -181,7 +181,16 @@ textarea { min-height: 120px; font-family: monospace; font-size: 12px; line-heig
 /* ============================================================
    Protokoll (Ersatz für die fehlende Konsole auf dem Tablet)
    ============================================================ */
-#logBox {
+#logBox, #logBox2 {
+  /* Textfeld statt <pre>: Fully Kiosk verweigert die Zwischenablage
+     ("Write permission denied"), und execCommand ueberredet sie auch nicht.
+     In einem Textfeld greift dafuer Androids eigenes Markieren zuverlaessig. */
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  resize: none;
+  height: 300px;
+  white-space: pre;
   margin: 10px 0 0 0;
   padding: 10px;
   max-height: 300px;
@@ -940,7 +949,7 @@ body.has-player #screenKid { padding-bottom: 150px; }
         <button class="btn" id="btnLogCopy1">Kopieren</button>
         <button class="btn ghost" id="btnLogClear1">Leeren</button>
       </div>
-      <pre id="logBox" class="selectable"></pre>
+      <textarea id="logBox" class="selectable" readonly spellcheck="false"></textarea>
     </div>
   </div>
 </section>
@@ -1153,7 +1162,7 @@ body.has-player #screenKid { padding-bottom: 150px; }
         <button class="btn" id="btnLogCopy2">Kopieren</button>
         <button class="btn ghost" id="btnLogClear2">Leeren</button>
       </div>
-      <pre id="logBox2" class="selectable"></pre>
+      <textarea id="logBox2" class="selectable" readonly spellcheck="false"></textarea>
     </div>
 
   </div>
@@ -1303,8 +1312,13 @@ var Log = (function () {
     var text = lines.join("\n");
     var a = document.getElementById("logBox");
     var b = document.getElementById("logBox2");
-    if (a) { a.textContent = text; a.scrollTop = a.scrollHeight; }
-    if (b) { b.textContent = text; b.scrollTop = b.scrollHeight; }
+    // Ein <textarea> zeigt .value, nicht .textContent.
+    function fuellen(el) {
+      if (!el) return;
+      if (el.tagName === "TEXTAREA") el.value = text; else el.textContent = text;
+      el.scrollTop = el.scrollHeight;
+    }
+    fuellen(a); fuellen(b);
   }
 
   return {
@@ -4000,6 +4014,59 @@ var Bar = (function () {
 
   function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
 
+  /* Sofort anzeigen, was gestartet wurde - vor jedem Netzaufruf. */
+  function zeigeVorab(image, title, dauerMs) {
+    showBar(true);
+    setCover(image || null, true);
+    var t = $("pTitle"); if (t) t.textContent = title || "";
+    running = true;
+    posMs = 0; durMs = dauerMs || 0;
+    paintProgress();
+    startTick();
+  }
+
+  /* Titelliste und Bild zu einem laufenden Kontext aus dem Cache. */
+  function kontextListe(ctxUri) {
+    var m = /^spotify:album:(.+)$/.exec(ctxUri || "");
+    if (m) {
+      var al = App.cache && App.cache.albums && App.cache.albums[m[1]];
+      return al ? { tracks: al.tracks || [], bild: al.image } : null;
+    }
+    m = /^spotify:playlist:(.+)$/.exec(ctxUri || "");
+    if (m) {
+      var sid = playlistSourceIdFor(m[1]);
+      var pl = sid && App.cache && App.cache.playlists && App.cache.playlists[sid];
+      return pl ? { tracks: pl.tracks || [], bild: null } : null;
+    }
+    return null;
+  }
+
+  /* Welcher Titel kaeme als naechster bzw. voriger?
+
+     Bei Geschichten ist das eindeutig: Der Kontext ist ein Album, die
+     Reihenfolge steht im Cache. Dann darf die Leiste ihn sofort zeigen, statt
+     auf Spotify zu warten - gemessen am Geraet waren das 1774 ms, in denen
+     GET /player noch zweimal den ALTEN Titel meldete, obwohl die Musik laengst
+     gewechselt hatte.
+
+     Bei eingeschaltetem Shuffle ist die Reihenfolge NICHT vorhersagbar. Dort
+     wird bewusst nicht geraten, sondern wie bisher auf die Bestaetigung
+     gewartet - lieber kurz nichts als kurz etwas Falsches. */
+  function nachbar(richtung) {
+    if (!last || !last.item || last.shuffle_state) return null;
+    var kl = kontextListe(last.context && last.context.uri);
+    if (!kl || kl.tracks.length < 2) return null;
+    var i = -1;
+    for (var k = 0; k < kl.tracks.length; k++) {
+      if (kl.tracks[k].uri === last.item.uri) { i = k; break; }
+    }
+    if (i < 0) return null;
+    var j = i + richtung;
+    if (j < 0 || j >= kl.tracks.length) return null;
+    var t = kl.tracks[j];
+    return { uri: t.uri, name: t.name, ms: t.ms, bild: t.image || kl.bild };
+  }
+
   /* Waehrend ein Sprung laeuft, sind Vor/Zurueck sichtbar gedaempft und taub.
      Grund: Die Leiste haengt der Wiedergabe um bis zu fuenf Sekunden hinterher.
      Ohne Sperre tippt ein Kind nach, weil nichts passiert - und landet mehrere
@@ -4069,11 +4136,20 @@ var Bar = (function () {
       return;
     }
     var before = last && last.item && last.item.uri;
+    // Steht das Ziel fest, sofort zeigen - nicht auf Spotify warten.
+    var ziel = nachbar(-1);
+    if (ziel) zeigeVorab(ziel.bild, ziel.name, ziel.ms);
     try {
       await Api.post("/v1/me/player/previous");
     } catch (e) {
       Log.info("Zurueck abgelehnt (" + fehlerText(e) + ") - spiele stattdessen von vorn.");
-      await seekStart();
+      await seekStart();          // korrigiert die Anzeige selbst wieder
+      return;
+    }
+    if (ziel) {
+      // Anzeige stimmt schon. Den echten Stand nur nachziehen, ohne den Knopf
+      // solange zu sperren - das waren gemessen 1774 ms Wartezeit umsonst.
+      setTimeout(function () { once(); }, 900);
       return;
     }
     await confirmChange(before);
@@ -4087,12 +4163,16 @@ var Bar = (function () {
     var dis = last && last.actions && last.actions.disallows;
     if (dis && dis.skipping_next) { Log.info("Letzter Titel - nichts zu tun."); return; }
     var before = last && last.item && last.item.uri;
+    var ziel = nachbar(1);
+    if (ziel) zeigeVorab(ziel.bild, ziel.name, ziel.ms);
     try {
       await Api.post("/v1/me/player/next");
     } catch (e) {
       Log.info("Vorwaerts abgelehnt (" + fehlerText(e) + ") - nichts zu tun.");
+      if (ziel) setTimeout(function () { once(); }, 200);   // Anzeige richtigstellen
       return;
     }
+    if (ziel) { setTimeout(function () { once(); }, 900); return; }
     await confirmChange(before);
   }
 
@@ -4118,15 +4198,7 @@ var Bar = (function () {
        vom Geraet. Das ist KEINE Vermutung wie bei Vor/Zurueck: Wir zeigen, was
        wir selbst angefordert haben, und das Bild liegt als Kachel schon im
        Bildspeicher der WebView, kostet also keinen neuen Ladevorgang. */
-    showPending: function (image, title, dauerMs) {
-      showBar(true);
-      setCover(image || null, true);
-      var t = $("pTitle"); if (t) t.textContent = title || "";
-      running = true;
-      posMs = 0; durMs = dauerMs || 0;
-      paintProgress();
-      startTick();
-    },
+    showPending: zeigeVorab,
 
     /* Den echten Stand kurz darauf nachziehen, ohne den Tipp aufzuhalten. */
     soon: function (ms) { setTimeout(function () { once(); }, ms || 700); },
@@ -5425,6 +5497,20 @@ async function copyLog(statusId) {
       return;
     }
   } catch (e) { Log.warn("clipboard.writeText fehlgeschlagen:", e && e.message); }
+  // Zuerst das sichtbare Protokollfeld selbst: Ein Element, das im Layout
+  // steht und den Fokus bekommen kann, laesst sich eher kopieren als ein
+  // ausgelagertes - genau daran ist der erste Versuch am Geraet gescheitert.
+  var sicht = $("logBox2") || $("logBox");
+  if (sicht && sicht.tagName === "TEXTAREA" && sicht.setSelectionRange) {
+    try {
+      sicht.focus();
+      sicht.setSelectionRange(0, text.length);
+      if (document.execCommand("copy")) {
+        setStatus(statusId, "Protokoll kopiert (" + text.length + " Zeichen).", "ok");
+        return;
+      }
+    } catch (e0) { Log.warn("Kopie am Protokollfeld fehlgeschlagen:", e0 && e0.message); }
+  }
   try {
     var ta = document.createElement("textarea");
     ta.value = text;
@@ -5440,7 +5526,7 @@ async function copyLog(statusId) {
     var ok = document.execCommand("copy");
     document.body.removeChild(ta);
     setStatus(statusId, ok ? "Protokoll kopiert (" + text.length + " Zeichen)."
-                           : "Kopieren ging nicht - Text im Protokoll von Hand markieren.",
+                           : "Kopieren gesperrt - lange auf das Protokoll tippen, alles markieren, kopieren.",
               ok ? "ok" : "err");
   } catch (e2) {
     Log.warn("execCommand-Kopie fehlgeschlagen:", e2 && e2.message);
@@ -5453,7 +5539,7 @@ async function copyLog(statusId) {
    Zahl an, die nichts mehr bedeutet – und genau dafür ist sie da: erkennen,
    ob nach einem Push schon der neue Stand geladen ist. Ablesen mit
    `git rev-list --count HEAD` (+1 für den Commit, der gerade entsteht). */
-var APP_VERSION = "v29";
+var APP_VERSION = "v30";
 
 async function boot() {
   var vb = $("verBadge");
