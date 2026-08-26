@@ -1769,11 +1769,28 @@ var Api = (function () {
     return json;
   }
 
+  /* Messhilfe: Jeder Aufruf schreibt seine Dauer ins Protokoll. Ohne harte
+     Zahlen vom Zielgeraet ist jede Tempo-Aussage geraten - genau das ist bei
+     Punkt Z zweimal passiert. Kurzer Pfadname, damit die Zeile lesbar bleibt. */
+  function kurz(path) {
+    return String(path).replace("/v1/me/player", "").split("?")[0] || "/player";
+  }
+  async function gemessen(path, options, n) {
+    var t0 = Date.now();
+    var fehler = null;
+    try { return await request(path, options, n); }
+    catch (e) { fehler = e; throw e; }
+    finally {
+      Log.info("  " + ((options && options.method) || "GET") + " " + kurz(path) +
+               " " + (Date.now() - t0) + " ms" + (fehler ? " (FEHLER)" : ""));
+    }
+  }
+
   return {
-    get: function (path) { return request(path, { method: "GET" }, 0); },
-    put: function (path, body) { return request(path, { method: "PUT", body: body }, 0); },
-    post: function (path, body) { return request(path, { method: "POST", body: body }, 0); },
-    me: function () { return request("/v1/me", { method: "GET" }, 0); }
+    get: function (path) { return gemessen(path, { method: "GET" }, 0); },
+    put: function (path, body) { return gemessen(path, { method: "PUT", body: body }, 0); },
+    post: function (path, body) { return gemessen(path, { method: "POST", body: body }, 0); },
+    me: function () { return gemessen("/v1/me", { method: "GET" }, 0); }
   };
 })();
 
@@ -3953,11 +3970,16 @@ var Bar = (function () {
      sobald sich der Titel wirklich geaendert hat. */
   async function confirmChange(beforeUri) {
     var waits = [150, 350, 600, 900];   // erste Rueckfrage frueh, dann geduldiger
+    var t0 = Date.now();
     for (var i = 0; i < waits.length; i++) {
       await wait(waits[i]);
       var st = await once();
       var uri = st && st.item && st.item.uri;
-      if (uri && uri !== beforeUri) return true;
+      if (uri && uri !== beforeUri) {
+        Log.info("  Titelwechsel bestaetigt nach " + (Date.now() - t0) +
+                 " ms (" + (i + 1) + ". Rueckfrage)");
+        return true;
+      }
     }
     Log.warn("Sprung nicht bestaetigt - die Anzeige zieht beim naechsten Takt nach.");
     return false;
@@ -4190,10 +4212,13 @@ function hideError() {
 /* Jede Kinderaktion läuft hierdurch: einmal ausführen, bei Fehler das Overlay,
    und „Nochmal versuchen" wiederholt genau diese Aktion – kein Neuladen. */
 async function guard(fn) {
+  var t0 = Date.now();
   try {
     hideError();
     await fn();
+    Log.info("== Aktion fertig nach " + (Date.now() - t0) + " ms ==");
   } catch (e) {
+    Log.warn("== Aktion abgebrochen nach " + (Date.now() - t0) + " ms ==");
     showError(e, fn);
   }
 }
@@ -5334,7 +5359,7 @@ async function copyLog(statusId) {
    Zahl an, die nichts mehr bedeutet – und genau dafür ist sie da: erkennen,
    ob nach einem Push schon der neue Stand geladen ist. Ablesen mit
    `git rev-list --count HEAD` (+1 für den Commit, der gerade entsteht). */
-var APP_VERSION = "v26";
+var APP_VERSION = "v27";
 
 async function boot() {
   var vb = $("verBadge");
