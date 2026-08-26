@@ -1690,6 +1690,12 @@ var Auth = (function () {
    Hängt den Token an, erneuert bei 401 genau einmal, wiederholt bei 429 nach
    Retry-After. Jeder Fehler landet im Protokoll.
    ------------------------------------------------------------------------ */
+/* Ohne additional_types=episode liefert GET /v1/me/player bei einer laufenden
+   Podcast-Folge `item: null`. Die Leiste sah darin "nichts laeuft" und blendete
+   sich aus - am Geraet gemeldet als "bei Podcast-Folgen gibt es keinen Player".
+   Der Episoden-Zweig in apply() war laengst gebaut, bekam nur nie Daten. */
+var PLAYER_PFAD = "/v1/me/player?additional_types=episode";
+
 var Api = (function () {
   var BASE = "https://api.spotify.com";
   var MAX_429 = 3;
@@ -3564,7 +3570,7 @@ var Player = (function () {
       Log.info("Leistenstand ist frisch - Statusabfrage gespart.");
       return Bar.state();
     }
-    try { return await Api.get("/v1/me/player"); }
+    try { return await Api.get(PLAYER_PFAD); }
     catch (e) { Log.warn("Status nicht lesbar:", e && e.message); return null; }
   }
 
@@ -3604,7 +3610,6 @@ var Player = (function () {
       var folge = album.tracks[0];
       if (!folge) throw new Error("empty_episode");
 
-      var dev = await ensureDevice(App.cfg);
       var body = { uris: [folge.uri] };
 
       if (!fromStart) {
@@ -3618,7 +3623,12 @@ var Player = (function () {
         }
       }
 
+      // VOR ensureDevice: Steht der Aufruf dahinter, erscheint der neue Titel
+      // erst, wenn die Geraeteabfrage durch ist - genau die gemeldeten drei
+      // Sekunden. Die Anzeige braucht kein Netz, also darf sie nicht darauf warten.
       Bar.showPending(album.image, folge.name || album.name, folge.ms);
+
+      var dev = await ensureDevice(App.cfg);
       await sendPlay(dev, body, "off");
       // Ohne Kontext gibt es nichts, woran die Oberflaeche die Kachel erkennt –
       // deshalb die Kachel-ID selbst festhalten.
@@ -3646,7 +3656,6 @@ var Player = (function () {
         return;
       }
 
-      var dev = await ensureDevice(App.cfg);
       var body = { context_uri: ctx };
 
       if (!fromStart) {
@@ -3675,9 +3684,13 @@ var Player = (function () {
         }
       }
       if (!start) start = album.tracks[0];
+      // VOR ensureDevice: Steht der Aufruf dahinter, erscheint der neue Titel
+      // erst, wenn die Geraeteabfrage durch ist - genau die gemeldeten drei
+      // Sekunden. Die Anzeige braucht kein Netz, also darf sie nicht darauf warten.
       Bar.showPending(album.image, (start && start.name) || album.name,
                       start && start.ms);
 
+      var dev = await ensureDevice(App.cfg);
       await sendPlay(dev, body, "off");
       setPlaying(ctx, albumId, body.offset ? body.offset.uri : null);
     },
@@ -3687,13 +3700,16 @@ var Player = (function () {
        ohnehin nur aus sich selbst – dort ist die Warteschlange der einzige Weg. */
     async playChapter(albumId, position) {
       var album = albumById(albumId);
-      var dev = await ensureDevice(App.cfg);
-
       if (album && album.isEpisode) return this.playEpisode(album, true);
 
       var ctx = "spotify:album:" + albumId;
       var tr = album && album.tracks[position];
+      // VOR ensureDevice: Steht der Aufruf dahinter, erscheint der neue Titel
+      // erst, wenn die Geraeteabfrage durch ist - genau die gemeldeten drei
+      // Sekunden. Die Anzeige braucht kein Netz, also darf sie nicht darauf warten.
       Bar.showPending(album && album.image, tr && tr.name, tr && tr.ms);
+
+      var dev = await ensureDevice(App.cfg);
       await sendPlay(dev, { context_uri: ctx, offset: { position: position } }, "off");
       setPlaying(ctx, albumId, tr && tr.uri);
     },
@@ -3702,16 +3718,17 @@ var Player = (function () {
       var se = sourceEntry(sourceId);
       if (!se) throw new Error("unknown_source");
       var ctx = "spotify:playlist:" + se.spotifyPlaylistId;
+      // VOR ensureDevice, damit die Anzeige nicht auf das Netz wartet.
+      // Gemischt: Welcher Titel kommt, wissen wir nicht. Playlist-Bild und
+      // -Name sind trotzdem richtiger als der vorige Titel.
+      Bar.showPending(se.image, se.name || se.playlistName, 0);
+
       var dev = await ensureDevice(App.cfg);
       // Die ganze Musik-Playlist startet ausdrücklich GEMISCHT. Vorher blieb
       // der Shuffle-Zustand unangetastet – dann hing die Reihenfolge davon ab,
       // wie Spotify zuletzt verlassen wurde, und dieselbe Kachel begann Tag für
       // Tag mit demselben Lied. Ein einzelner Titel bleibt davon unberührt
       // (playPlaylistTrack schaltet aus), sonst käme das getippte Lied nicht.
-      // Gemischt: Welcher Titel kommt, wissen wir nicht. Playlist-Bild und
-      // -Name sind trotzdem richtiger als der vorige Titel, und Bar.soon holt
-      // in 700 ms den echten Stand nach.
-      Bar.showPending(se.image, se.name || se.playlistName, 0);
       await sendPlay(dev, { context_uri: ctx }, "on");
       setPlaying(ctx, sourceId, null);
     },
@@ -3737,10 +3754,12 @@ var Player = (function () {
       }
       var uris = [];
       for (var i = 0; i < teil.length; i++) uris.push(teil[i].uri);
+      // VOR ensureDevice, damit die Anzeige nicht auf das Netz wartet.
+      Bar.showPending(teil[0].image, teil[0].name, teil[0].ms);
+
       var dev = await ensureDevice(App.cfg);
       // Shuffle aus: sonst spielt Spotify die uebergebene Liste durcheinander
       // und das getippte Lied kaeme nicht zuerst.
-      Bar.showPending(teil[0].image, teil[0].name, teil[0].ms);
       await sendPlay(dev, { uris: uris }, "off");
       setPlaying(null, FAV_ID, teil[0].uri);
     },
@@ -3749,15 +3768,17 @@ var Player = (function () {
       var se = sourceEntry(sourceId);
       if (!se) throw new Error("unknown_source");
       var ctx = "spotify:playlist:" + se.spotifyPlaylistId;
-      var dev = await ensureDevice(App.cfg);
-      // Einzelner Titel: Shuffle aus, sonst kommt danach etwas Zufälliges.
       var liste = (App.cache.playlists && App.cache.playlists[sourceId] &&
                    App.cache.playlists[sourceId].tracks) || [];
       var gew = null;
       for (var i = 0; i < liste.length; i++) {
         if (liste[i].uri === trackUri) { gew = liste[i]; break; }
       }
+      // VOR ensureDevice, damit die Anzeige nicht auf das Netz wartet.
       Bar.showPending(gew && gew.image, gew && gew.name, gew && gew.ms);
+
+      var dev = await ensureDevice(App.cfg);
+      // Einzelner Titel: Shuffle aus, sonst kommt danach etwas Zufälliges.
       await sendPlay(dev, { context_uri: ctx, offset: { uri: trackUri } }, "off");
       setPlaying(ctx, sourceId, trackUri);
     }
@@ -3966,7 +3987,7 @@ var Bar = (function () {
   async function once() {
     var state = null;
     try {
-      state = await Api.get("/v1/me/player");
+      state = await Api.get(PLAYER_PFAD);
     } catch (e) {
       Log.warn("Player-Status nicht lesbar:", (e && (e.status || e.message)) || "?");
       return null;
@@ -5432,7 +5453,7 @@ async function copyLog(statusId) {
    Zahl an, die nichts mehr bedeutet – und genau dafür ist sie da: erkennen,
    ob nach einem Push schon der neue Stand geladen ist. Ablesen mit
    `git rev-list --count HEAD` (+1 für den Commit, der gerade entsteht). */
-var APP_VERSION = "v28";
+var APP_VERSION = "v29";
 
 async function boot() {
   var vb = $("verBadge");
