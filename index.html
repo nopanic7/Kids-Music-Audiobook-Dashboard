@@ -3546,6 +3546,9 @@ var Player = (function () {
 
     try {
       await Api.put("/v1/me/player/play?" + q, body);
+      // Nicht abwarten: Die Leiste zeigt dank showPending schon das Richtige,
+      // das hier holt nur die Bestaetigung nach.
+      if (typeof Bar !== "undefined" && Bar) Bar.soon(700);
     } catch (e3) {
       // Geraet weg oder ID veraltet: Zwischenspeicher verwerfen, damit der
       // naechste Versuch eine frische Liste holt.
@@ -3615,6 +3618,7 @@ var Player = (function () {
         }
       }
 
+      Bar.showPending(album.image, folge.name || album.name, folge.ms);
       await sendPlay(dev, body, "off");
       // Ohne Kontext gibt es nichts, woran die Oberflaeche die Kachel erkennt –
       // deshalb die Kachel-ID selbst festhalten.
@@ -3663,6 +3667,17 @@ var Player = (function () {
         }
       }
 
+      // Welcher Titel faengt an? Der fortgesetzte, sonst der erste.
+      var start = null;
+      if (body.offset && body.offset.uri) {
+        for (var k = 0; k < album.tracks.length; k++) {
+          if (album.tracks[k].uri === body.offset.uri) { start = album.tracks[k]; break; }
+        }
+      }
+      if (!start) start = album.tracks[0];
+      Bar.showPending(album.image, (start && start.name) || album.name,
+                      start && start.ms);
+
       await sendPlay(dev, body, "off");
       setPlaying(ctx, albumId, body.offset ? body.offset.uri : null);
     },
@@ -3677,8 +3692,9 @@ var Player = (function () {
       if (album && album.isEpisode) return this.playEpisode(album, true);
 
       var ctx = "spotify:album:" + albumId;
-      await sendPlay(dev, { context_uri: ctx, offset: { position: position } }, "off");
       var tr = album && album.tracks[position];
+      Bar.showPending(album && album.image, tr && tr.name, tr && tr.ms);
+      await sendPlay(dev, { context_uri: ctx, offset: { position: position } }, "off");
       setPlaying(ctx, albumId, tr && tr.uri);
     },
 
@@ -3692,6 +3708,10 @@ var Player = (function () {
       // wie Spotify zuletzt verlassen wurde, und dieselbe Kachel begann Tag für
       // Tag mit demselben Lied. Ein einzelner Titel bleibt davon unberührt
       // (playPlaylistTrack schaltet aus), sonst käme das getippte Lied nicht.
+      // Gemischt: Welcher Titel kommt, wissen wir nicht. Playlist-Bild und
+      // -Name sind trotzdem richtiger als der vorige Titel, und Bar.soon holt
+      // in 700 ms den echten Stand nach.
+      Bar.showPending(se.image, se.name || se.playlistName, 0);
       await sendPlay(dev, { context_uri: ctx }, "on");
       setPlaying(ctx, sourceId, null);
     },
@@ -3720,6 +3740,7 @@ var Player = (function () {
       var dev = await ensureDevice(App.cfg);
       // Shuffle aus: sonst spielt Spotify die uebergebene Liste durcheinander
       // und das getippte Lied kaeme nicht zuerst.
+      Bar.showPending(teil[0].image, teil[0].name, teil[0].ms);
       await sendPlay(dev, { uris: uris }, "off");
       setPlaying(null, FAV_ID, teil[0].uri);
     },
@@ -3730,6 +3751,13 @@ var Player = (function () {
       var ctx = "spotify:playlist:" + se.spotifyPlaylistId;
       var dev = await ensureDevice(App.cfg);
       // Einzelner Titel: Shuffle aus, sonst kommt danach etwas Zufälliges.
+      var liste = (App.cache.playlists && App.cache.playlists[sourceId] &&
+                   App.cache.playlists[sourceId].tracks) || [];
+      var gew = null;
+      for (var i = 0; i < liste.length; i++) {
+        if (liste[i].uri === trackUri) { gew = liste[i]; break; }
+      }
+      Bar.showPending(gew && gew.image, gew && gew.name, gew && gew.ms);
       await sendPlay(dev, { context_uri: ctx, offset: { uri: trackUri } }, "off");
       setPlaying(ctx, sourceId, trackUri);
     }
@@ -4062,6 +4090,25 @@ var Bar = (function () {
 
   return {
     state: function () { return last; },
+
+    /* Sofort anzeigen, was gerade gestartet wurde. Ohne das aktualisiert sich
+       die Leiste erst beim naechsten 5-s-Takt: Der Ton kam laengst, aber Cover
+       und Titel standen noch auf dem vorigen Stueck - genau die Beobachtung
+       vom Geraet. Das ist KEINE Vermutung wie bei Vor/Zurueck: Wir zeigen, was
+       wir selbst angefordert haben, und das Bild liegt als Kachel schon im
+       Bildspeicher der WebView, kostet also keinen neuen Ladevorgang. */
+    showPending: function (image, title, dauerMs) {
+      showBar(true);
+      setCover(image || null, true);
+      var t = $("pTitle"); if (t) t.textContent = title || "";
+      running = true;
+      posMs = 0; durMs = dauerMs || 0;
+      paintProgress();
+      startTick();
+    },
+
+    /* Den echten Stand kurz darauf nachziehen, ohne den Tipp aufzuhalten. */
+    soon: function (ms) { setTimeout(function () { once(); }, ms || 700); },
     // Alter des Stands in ms. Der Wiedergabepfad entscheidet damit, ob er
     // sich eine eigene Statusabfrage sparen kann.
     stateAge: function () { return last ? (Date.now() - lastAt) : Infinity; },
@@ -5342,16 +5389,42 @@ function wire() {
   document.addEventListener("dblclick", function (e) { e.preventDefault(); }, false);
 }
 
+/* Das Protokoll steht in einem <pre>, das kein setSelectionRange kennt -
+   copyFrom() greift hier also nicht. Und navigator.clipboard fehlt in der
+   Android-6-WebView praktisch immer, weshalb der Knopf bisher nichts tat und
+   auch nichts sagte. Deshalb: Text in ein kurzlebiges Textfeld legen,
+   markieren, execCommand. Das kann die alte WebView. */
 async function copyLog(statusId) {
   var text = Log.text();
+  if (!text) { setStatus(statusId, "Das Protokoll ist leer.", "err"); return; }
   try {
     if (navigator.clipboard && navigator.clipboard.writeText) {
       await navigator.clipboard.writeText(text);
-      setStatus(statusId, "Protokoll kopiert.", "ok");
+      setStatus(statusId, "Protokoll kopiert (" + text.length + " Zeichen).", "ok");
       return;
     }
-  } catch (e) {}
-  setStatus(statusId, "Kopieren nicht möglich – Text im Protokoll markieren.", "err");
+  } catch (e) { Log.warn("clipboard.writeText fehlgeschlagen:", e && e.message); }
+  try {
+    var ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "readonly");
+    // Nicht display:none - unsichtbare Felder lassen sich nicht markieren.
+    ta.style.position = "fixed";
+    ta.style.left = "-9999px";
+    ta.style.top = "0";
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    if (ta.setSelectionRange) ta.setSelectionRange(0, text.length);
+    var ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    setStatus(statusId, ok ? "Protokoll kopiert (" + text.length + " Zeichen)."
+                           : "Kopieren ging nicht - Text im Protokoll von Hand markieren.",
+              ok ? "ok" : "err");
+  } catch (e2) {
+    Log.warn("execCommand-Kopie fehlgeschlagen:", e2 && e2.message);
+    setStatus(statusId, "Kopieren ging nicht - Text im Protokoll von Hand markieren.", "err");
+  }
 }
 
 /* Versionsnummer = laufende Commit-Nummer dieses Standes.
@@ -5359,7 +5432,7 @@ async function copyLog(statusId) {
    Zahl an, die nichts mehr bedeutet – und genau dafür ist sie da: erkennen,
    ob nach einem Push schon der neue Stand geladen ist. Ablesen mit
    `git rev-list --count HEAD` (+1 für den Commit, der gerade entsteht). */
-var APP_VERSION = "v27";
+var APP_VERSION = "v28";
 
 async function boot() {
   var vb = $("verBadge");
