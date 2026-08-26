@@ -3337,9 +3337,23 @@ var Player = (function () {
     return !cfg.preferredDeviceId && !cfg.preferredDeviceName;
   }
 
-  async function listDevices() {
+  /* Die Geraeteliste aendert sich zwischen zwei Kacheltipps praktisch nie,
+     kostet aber jedes Mal eine volle Netzwerkrunde - auf dem Tablet rund
+     800 ms. Deshalb kurz zwischenspeichern. Wird die Liste doch veraltet
+     sein, antwortet /play mit 404; dann verwirft sendPlay den Speicher und
+     das vorhandene "Nochmal versuchen" holt sie frisch. */
+  var devCache = null, devCacheAt = 0;
+  var DEV_CACHE_MS = 30000;
+  function forgetDevices() { devCache = null; }
+  function devicesAreCached() {
+    return !!(devCache && (Date.now() - devCacheAt) < DEV_CACHE_MS);
+  }
+
+  async function listDevices(force) {
+    if (!force && devCache && (Date.now() - devCacheAt) < DEV_CACHE_MS) return devCache;
     var res = await Api.get("/v1/me/player/devices");
     var list = (res && res.devices) || [];
+    devCache = list; devCacheAt = Date.now();
     var names = [];
     for (var i = 0; i < list.length; i++) {
       names.push(list[i].name + (list[i].is_active ? " (aktiv)" : ""));
@@ -3414,7 +3428,16 @@ var Player = (function () {
   }
 
   async function ensureDevice(cfg) {
+    var ausSpeicher = devicesAreCached();
     var list = await listDevices();
+    // Fehlt das gewuenschte Geraet und kam der Stand aus dem Speicher, erst
+    // frisch nachsehen: Sonst loeste ein veralteter Speicher einen
+    // ueberfluessigen Spotify-Neustart aus - teurer als die gesparte Runde.
+    // War die Liste ohnehin frisch, waere ein zweiter Abruf reine Wartezeit.
+    if (ausSpeicher && (!list.length || tabletFehlt(cfg, list))) {
+      Log.info("Gerät fehlt im gespeicherten Stand - hole die Liste frisch.");
+      list = await listDevices(true);
+    }
     var fehlt = !list.length ? "Kein Gerät"
               : tabletFehlt(cfg, list) ? "Tablet fehlt in der Liste"
               : null;
@@ -3428,7 +3451,7 @@ var Player = (function () {
       try {
         for (var t = 0; t < REVIVE_TRIES; t++) {
           await sleep(REVIVE_WAIT_MS);
-          list = await listDevices();
+          list = await listDevices(true);   // hier NIE aus dem Speicher
           if (list.length && !tabletFehlt(cfg, list)) break;
         }
       } finally {
@@ -3482,17 +3505,45 @@ var Player = (function () {
      hinge es davon ab, wie Spotify zuletzt verlassen wurde. */
   async function sendPlay(dev, body, shuffle) {
     var q = "device_id=" + encodeURIComponent(dev.id);
+    // Frischer Stand aus der Leiste: Steht Shuffle/Repeat schon richtig, faellt
+    // der jeweilige Aufruf ganz weg. Repeat schalten wir selbst bei jedem Start
+    // ab - es ist deshalb fast immer schon aus, und der Aufruf war reine
+    // Wartezeit.
+    var st = (typeof Bar !== "undefined" && Bar && Bar.stateAge() <= 6000) ? Bar.state() : null;
+    var jobs = [];
+
     if (shuffle === "on" || shuffle === "off") {
-      var wert = shuffle === "on" ? "true" : "false";
-      try { await Api.put("/v1/me/player/shuffle?state=" + wert + "&" + q); }
-      catch (e) { Log.warn("Shuffle konnte nicht auf " + wert + " gesetzt werden:", e && e.message); }
+      var an = shuffle === "on";
+      if (!st || st.shuffle_state !== an) {
+        jobs.push(Api.put("/v1/me/player/shuffle?state=" + (an ? "true" : "false") + "&" + q)
+          ["catch"](function (e) { Log.warn("Shuffle nicht gesetzt:", e && e.message); }));
+      } else { Log.info("Shuffle steht schon richtig - Aufruf gespart."); }
     }
-    try { await Api.put("/v1/me/player/repeat?state=off&" + q); }
-    catch (e2) { Log.warn("Repeat konnte nicht abgeschaltet werden:", e2 && e2.message); }
-    await Api.put("/v1/me/player/play?" + q, body);
+    if (!st || st.repeat_state !== "off") {
+      jobs.push(Api.put("/v1/me/player/repeat?state=off&" + q)
+        ["catch"](function (e2) { Log.warn("Repeat nicht abgeschaltet:", e2 && e2.message); }));
+    } else { Log.info("Repeat ist schon aus - Aufruf gespart."); }
+
+    // Beide sind voneinander unabhaengig, nur /play muss danach kommen.
+    if (jobs.length) await Promise.all(jobs);
+
+    try {
+      await Api.put("/v1/me/player/play?" + q, body);
+    } catch (e3) {
+      // Geraet weg oder ID veraltet: Zwischenspeicher verwerfen, damit der
+      // naechste Versuch eine frische Liste holt.
+      if (e3 && (e3.status === 404 || e3.status === 403)) forgetDevices();
+      throw e3;
+    }
   }
 
-  async function nowPlaying() {
+  async function nowPlaying(maxAgeMs) {
+    // Die Leiste fragt ohnehin alle 5 s. Ist ihr Stand jung genug, spart das
+    // hier eine ganze Runde, bevor ueberhaupt etwas gestartet wird.
+    if (maxAgeMs && typeof Bar !== "undefined" && Bar && Bar.stateAge() <= maxAgeMs) {
+      Log.info("Leistenstand ist frisch - Statusabfrage gespart.");
+      return Bar.state();
+    }
     try { return await Api.get("/v1/me/player"); }
     catch (e) { Log.warn("Status nicht lesbar:", e && e.message); return null; }
   }
@@ -3500,6 +3551,7 @@ var Player = (function () {
   return {
     pickDevice: pickDevice,
     ensureDevice: ensureDevice,
+    forgetDevices: forgetDevices,
     sendPlay: sendPlay,
     nowPlaying: nowPlaying,
 
@@ -3560,7 +3612,7 @@ var Player = (function () {
       var ctx = "spotify:album:" + albumId;
 
       // Läuft genau dieses Album schon? Dann nicht neu starten (Entscheidung F5).
-      var state = await nowPlaying();
+      var state = await nowPlaying(3000);
       if (!fromStart && state && state.context && state.context.uri === ctx) {
         if (state.is_playing) {
           Log.info("Album läuft bereits – kein Neustart.");
@@ -3685,6 +3737,7 @@ var Bar = (function () {
   var last = null;
   var tick = null, posMs = 0, durMs = 0, running = false;
   var busy = false, busySafety = null;   // laeuft gerade ein Sprung?
+  var lastAt = 0;                       // wann kam der Stand? (spart Runden)
 
   /* Die Abfrage läuft nur alle 5 s. Ohne eigenen Takt stünde der Balken
      dazwischen still und die Sekundenanzeige spränge in 5er-Schritten. Bei
@@ -3792,6 +3845,7 @@ var Bar = (function () {
 
   function apply(state) {
     last = state;
+    lastAt = Date.now();
     if (!state || !state.item) {
       showBar(false);
       running = false;
@@ -3898,7 +3952,7 @@ var Bar = (function () {
      naechsten 5-s-Takt fest. Deshalb mehrfach kurz nachfassen und aufhoeren,
      sobald sich der Titel wirklich geaendert hat. */
   async function confirmChange(beforeUri) {
-    var waits = [400, 500, 700, 900];
+    var waits = [150, 350, 600, 900];   // erste Rueckfrage frueh, dann geduldiger
     for (var i = 0; i < waits.length; i++) {
       await wait(waits[i]);
       var st = await once();
@@ -3986,6 +4040,9 @@ var Bar = (function () {
 
   return {
     state: function () { return last; },
+    // Alter des Stands in ms. Der Wiedergabepfad entscheidet damit, ob er
+    // sich eine eigene Statusabfrage sparen kann.
+    stateAge: function () { return last ? (Date.now() - lastAt) : Infinity; },
     isBusy: function () { return busy; },      // fuer den Pruefstand
     now: once,
     setCover: setCover,          // fuer den Pruefstand erreichbar
@@ -5277,7 +5334,7 @@ async function copyLog(statusId) {
    Zahl an, die nichts mehr bedeutet – und genau dafür ist sie da: erkennen,
    ob nach einem Push schon der neue Stand geladen ist. Ablesen mit
    `git rev-list --count HEAD` (+1 für den Commit, der gerade entsteht). */
-var APP_VERSION = "v25";
+var APP_VERSION = "v26";
 
 async function boot() {
   var vb = $("verBadge");
