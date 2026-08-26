@@ -3998,13 +3998,22 @@ var Bar = (function () {
     await Store.saveProgress(App.progress);
   }
 
+  var abfrageLaeuft = false;
+
   async function once() {
+    // Haengt die vorige Abfrage noch, KEINE zweite hinterherschicken. Am Geraet
+    // wurde eine einzelne Abfrage mit 4846 ms gemessen; in dieser Zeit haette
+    // der 5-s-Takt munter weitergefragt und die Lage verschlimmert.
+    if (abfrageLaeuft) { Log.info("  Abfrage laeuft noch - Takt uebersprungen."); return last; }
+    abfrageLaeuft = true;
     var state = null;
     try {
       state = await Api.get(PLAYER_PFAD);
     } catch (e) {
       Log.warn("Player-Status nicht lesbar:", (e && (e.status || e.message)) || "?");
       return null;
+    } finally {
+      abfrageLaeuft = false;
     }
     apply(state);
     if (state && state.item && state.is_playing) await remember(state);
@@ -4180,7 +4189,11 @@ var Bar = (function () {
   async function transport(fn, richtung) {
     if (busy) { Log.info("Tipp verworfen, " + richtung + " laeuft noch."); return; }
     setBusy(true);
-    busySafety = setTimeout(function () { setBusy(false); }, 4000);
+    // 12 s statt 4: Am Geraet wurden einzelne Aufrufe mit 5968 ms gemessen.
+    // Bei 4 s gab die Sperre den Knopf frei, waehrend der Befehl noch lief -
+    // ein zweiter Tipp rutschte durch. Das Netz raeumt `finally` ohnehin auf;
+    // dieser Wert faengt nur den Fall ab, dass eine Antwort NIE kommt.
+    busySafety = setTimeout(function () { setBusy(false); }, 12000);
     try {
       await fn();
     } finally {
@@ -5539,7 +5552,7 @@ async function copyLog(statusId) {
    Zahl an, die nichts mehr bedeutet – und genau dafür ist sie da: erkennen,
    ob nach einem Push schon der neue Stand geladen ist. Ablesen mit
    `git rev-list --count HEAD` (+1 für den Commit, der gerade entsteht). */
-var APP_VERSION = "v30";
+var APP_VERSION = "v31";
 
 async function boot() {
   var vb = $("verBadge");
