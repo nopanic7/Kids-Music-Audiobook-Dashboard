@@ -3909,31 +3909,75 @@ var Bar = (function () {
     return false;
   }
 
-  /* Am Anfang bzw. Ende einer Liste antwortet Spotify mit 403 und
-     reason NO_PREV_TRACK / NO_NEXT_TRACK. Das ist kein Fehler, sondern
-     "da ist nichts mehr" - und gehoert nicht auf den Fehlerbildschirm, schon
-     gar nicht, waehrend die Musik unveraendert weiterlaeuft.
-     Geprueft wird `reason`, NICHT der Status: Ein 403 heisst auch
-     "kein Premium", und der muss weiterhin gemeldet werden. */
-  async function transport(path, richtung) {
-    if (busy) { Log.info("Tipp verworfen, " + richtung + " laeuft noch."); return; }
+  function fehlerText(e) {
+    var r = e && e.body && e.body.error;
+    return ((e && e.status) || "?") + " " + ((r && r.reason) || (r && r.message) || (e && e.message) || "?");
+  }
+
+  /* Den laufenden Titel von vorn spielen. Der Balken wird sofort auf null
+     gesetzt, nicht erst beim naechsten Takt - das ist die sichtbare Antwort
+     auf den Tipp. */
+  async function seekStart() {
+    await Api.put("/v1/me/player/seek?position_ms=0");
+    posMs = 0;
+    paintProgress();
+    await wait(400);
+    await once();
+  }
+
+  /* "Zurueck" am ersten Titel spielt ihn von vorn (Wunsch des Nutzers,
+     26.08.2026).
+
+     Ob zurueck ueberhaupt geht, sagt Spotify im Zustand selbst:
+     `actions.disallows.skipping_prev`. Das ist verlaesslicher als auf einen
+     Fehlertext zu raten - beim ersten Versuch wurde auf reason
+     NO_PREV_TRACK geprueft, und genau das griff am Geraet nicht: Spotify
+     lehnt Transportbefehle je nach Fall auch mit "Restriction violated" und
+     reason UNKNOWN ab. Deshalb zusaetzlich der Auffangzweig: Schlaegt
+     /previous aus IRGENDEINEM Grund fehl, wird von vorn gespielt. Scheitert
+     auch das, war es ein echtes Problem und der Fehler geht durch. */
+  async function prevOrRestart() {
+    var dis = last && last.actions && last.actions.disallows;
+    if (dis && dis.skipping_prev) {
+      Log.info("Erster Titel - spiele ihn von vorn.");
+      await seekStart();
+      return;
+    }
     var before = last && last.item && last.item.uri;
+    try {
+      await Api.post("/v1/me/player/previous");
+    } catch (e) {
+      Log.info("Zurueck abgelehnt (" + fehlerText(e) + ") - spiele stattdessen von vorn.");
+      await seekStart();
+      return;
+    }
+    await confirmChange(before);
+  }
+
+  /* Am Listenende gibt es keine sinnvolle Ersatzhandlung. Ein Fehlschlag wird
+     protokolliert, erzeugt aber KEINEN Fehlerbildschirm: Die Musik laeuft
+     weiter, und ein Vollbild-Fehler ueber laufender Wiedergabe war genau die
+     Meldung, die diesen Umbau ausgeloest hat. */
+  async function nextTrack() {
+    var dis = last && last.actions && last.actions.disallows;
+    if (dis && dis.skipping_next) { Log.info("Letzter Titel - nichts zu tun."); return; }
+    var before = last && last.item && last.item.uri;
+    try {
+      await Api.post("/v1/me/player/next");
+    } catch (e) {
+      Log.info("Vorwaerts abgelehnt (" + fehlerText(e) + ") - nichts zu tun.");
+      return;
+    }
+    await confirmChange(before);
+  }
+
+  /* Klammer um beide: Sperre, Daempfung, Sicherheitsnetz. */
+  async function transport(fn, richtung) {
+    if (busy) { Log.info("Tipp verworfen, " + richtung + " laeuft noch."); return; }
     setBusy(true);
-    // Sicherheitsnetz wie bei setCover: Bleibt eine Antwort ganz aus, darf der
-    // Knopf nicht dauerhaft taub bleiben.
     busySafety = setTimeout(function () { setBusy(false); }, 4000);
     try {
-      try {
-        await Api.post(path);
-      } catch (e) {
-        var reason = e && e.body && e.body.error && e.body.error.reason;
-        if (reason === "NO_PREV_TRACK" || reason === "NO_NEXT_TRACK") {
-          Log.info("Kein Titel " + richtung + " - nichts zu tun (" + reason + ").");
-          return;
-        }
-        throw e;
-      }
-      await confirmChange(before);
+      await fn();
     } finally {
       if (busySafety) { clearTimeout(busySafety); busySafety = null; }
       setBusy(false);
@@ -3968,8 +4012,8 @@ var Bar = (function () {
       else await Player.resumeHere();
       setTimeout(once, 400);
     },
-    async next() { await transport("/v1/me/player/next", "vorwaerts"); },
-    async prev() { await transport("/v1/me/player/previous", "rueckwaerts"); }
+    async next() { await transport(nextTrack, "vorwaerts"); },
+    async prev() { await transport(prevOrRestart, "rueckwaerts"); }
   };
 })();
 
@@ -5233,7 +5277,7 @@ async function copyLog(statusId) {
    Zahl an, die nichts mehr bedeutet – und genau dafür ist sie da: erkennen,
    ob nach einem Push schon der neue Stand geladen ist. Ablesen mit
    `git rev-list --count HEAD` (+1 für den Commit, der gerade entsteht). */
-var APP_VERSION = "v24";
+var APP_VERSION = "v25";
 
 async function boot() {
   var vb = $("verBadge");
