@@ -5524,8 +5524,11 @@ function rowHtml(opts) {
          '</div>';
 }
 
-function sectionHead(svg, word) {
-  return '<div class="sec-head"><span class="mark"><span class="sym">' + svg +
+/* `pups` macht die Marke antippbar. Nur die Musikzeile bekommt das – die
+   Geschichten-Marke bleibt eine reine Beschriftung. */
+function sectionHead(svg, word, pups) {
+  return '<div class="sec-head"><span class="mark' + (pups ? " tap" : "") + '"' +
+           (pups ? ' data-pups="1"' : "") + '><span class="sym">' + svg +
          '</span>' + word + '</span></div>';
 }
 
@@ -5549,7 +5552,7 @@ function renderLevel1() {
   // hat: eine leere Kachel waere fuer das Kind eine Sackgasse.
   var favs = visibleTracks(favList());
   if (favs.length || music.length) {
-    html += sectionHead(SVG_MUSIC, "Musik") + '<div class="rows two">';
+    html += sectionHead(SVG_MUSIC, "Musik", true) + '<div class="rows two">';
     if (favs.length) {
       html += rowHtml({
         action: ' data-play="favall" data-id="' + FAV_ID + '"',
@@ -5707,6 +5710,14 @@ function onKidTap(e) {
   // Nach einem langen Druck folgt trotzdem ein Klick. Ohne diese Sperre
   // startete die Kachel die Wiedergabe, während die Rückfrage noch offen ist.
   if (Langdruck.gesperrt()) { Log.info("Tipp nach langem Druck verworfen."); return; }
+  // Die Musik-Marke ist weder Kachel noch Zeile – sie muss deshalb vor der
+  // üblichen Suche nach data-open/data-play abgefragt werden (Punkt AJ).
+  var m = e.target;
+  while (m && m !== e.currentTarget) {
+    if (m.getAttribute && m.getAttribute("data-pups")) { Pups.los(); return; }
+    m = m.parentNode;
+  }
+
   var node = e.target;
   while (node && node !== e.currentTarget && !(node.getAttribute &&
          (node.getAttribute("data-open") || node.getAttribute("data-play")))) {
@@ -5875,6 +5886,99 @@ function toast(text) {
   if (toastTimer) clearTimeout(toastTimer);
   toastTimer = setTimeout(function () { el.className = ""; }, 1800);
 }
+
+/* ------------------------ Pups  (Punkt AJ) ------------------------------
+   Ein Tipp auf die Musik-Marke macht ein Pupsgeräusch. Ausdrücklicher Wunsch
+   des Nutzers vom 27.08.2026, und für ein Kind vermutlich das beste Merkmal
+   der ganzen App.
+
+   Erzeugt statt abgespielt: Eine Tondatei müsste als data-URI in die Seite,
+   das wären je nach Länge etliche hundert Kilobyte in einer Datei, die sonst
+   200 KB wiegt – und sie klänge bei jedem Tipp exakt gleich. Die Web-Audio-API
+   baut denselben Effekt aus ein paar Zeilen und würfelt jedes Mal neu.
+
+   So entsteht der Klang: ein Sägezahn im Bassbereich, der von etwa 130 auf
+   55 Hz abrutscht (das Absacken am Ende), dazu ein schneller Zittertor darauf,
+   der die Frequenz im Takt von 20–34 Hz auf und ab schiebt – das ist das
+   Knattern. Ein Tiefpass nimmt das Kratzige heraus, eine Hüllkurve setzt den
+   Anfang hart und lässt es weich auslaufen.
+
+   Der Ton geht durch den Browser, nicht durch Spotify: Beides landet auf
+   demselben Lautsprecher, die Musik läuft dabei unbeirrt weiter. */
+var Pups = (function () {
+  var ctx = null;
+  var zuletzt = 0;
+  var SPERRE_MS = 140;        // gegen Trommelfeuer, wenn das Kind hämmert
+
+  function holeCtx() {
+    if (ctx) return ctx;
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) { Log.warn("Kein Web Audio – kein Pups."); return null; }
+    try { ctx = new AC(); }
+    catch (e) { Log.warn("Audio ließ sich nicht öffnen:", (e && e.message) || "?"); return null; }
+    return ctx;
+  }
+
+  function zufall(von, bis) { return von + Math.random() * (bis - von); }
+
+  return {
+    los: function () {
+      var jetzt = Date.now();
+      if (jetzt - zuletzt < SPERRE_MS) return;
+      zuletzt = jetzt;
+
+      var c = holeCtx();
+      if (!c) return;
+      // Browser starten den Ton erst nach einer Berührung. Hier sind wir in
+      // genau so einer, also darf aufgeweckt werden.
+      if (c.state === "suspended" && c.resume) { try { c.resume(); } catch (e) {} }
+
+      try {
+        var t = c.currentTime;
+        var dauer = zufall(0.32, 0.62);
+        var hoch = zufall(115, 155);
+        var tief = zufall(48, 70);
+
+        var ton = c.createOscillator();
+        ton.type = "sawtooth";
+        ton.frequency.setValueAtTime(hoch, t);
+        ton.frequency.exponentialRampToValueAtTime(tief, t + dauer);
+
+        // Das Knattern: schiebt die Frequenz schnell auf und ab.
+        var zitter = c.createOscillator();
+        zitter.type = "sine";
+        zitter.frequency.setValueAtTime(zufall(20, 34), t);
+        var zitterTiefe = c.createGain();
+        zitterTiefe.gain.setValueAtTime(zufall(28, 48), t);
+        zitter.connect(zitterTiefe);
+        zitterTiefe.connect(ton.frequency);
+
+        var filter = c.createBiquadFilter();
+        filter.type = "lowpass";
+        filter.frequency.setValueAtTime(zufall(700, 1100), t);
+        filter.Q.setValueAtTime(4, t);
+
+        var huelle = c.createGain();
+        huelle.gain.setValueAtTime(0.0001, t);
+        huelle.gain.exponentialRampToValueAtTime(0.45, t + 0.02);
+        huelle.gain.setValueAtTime(0.45, t + dauer * 0.55);
+        huelle.gain.exponentialRampToValueAtTime(0.0001, t + dauer);
+
+        ton.connect(filter);
+        filter.connect(huelle);
+        huelle.connect(c.destination);
+
+        ton.start(t);
+        zitter.start(t);
+        ton.stop(t + dauer + 0.02);
+        zitter.stop(t + dauer + 0.02);
+        Log.info("Pups.");
+      } catch (e2) {
+        Log.warn("Pups misslungen:", (e2 && e2.message) || e2);
+      }
+    }
+  };
+})();
 
 /* --------------------- Großer Player  (Punkt AH) ------------------------
    Ein Tipp auf das kleine runde Cover in der Leiste zeigt das Bild groß.
@@ -6834,7 +6938,7 @@ async function copyLog(statusId) {
    Zahl an, die nichts mehr bedeutet – und genau dafür ist sie da: erkennen,
    ob nach einem Push schon der neue Stand geladen ist. Ablesen mit
    `git rev-list --count HEAD` (+1 für den Commit, der gerade entsteht). */
-var APP_VERSION = "v38";
+var APP_VERSION = "v39";
 
 async function boot() {
   var vb = $("verBadge");
