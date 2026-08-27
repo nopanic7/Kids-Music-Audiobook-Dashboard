@@ -3848,6 +3848,19 @@ var Player = (function () {
      und die Web-API kennt keinen Schalter dafür. Also merkt sich die Hörbox,
      was sie selbst gestartet hat. Taucht in der Abfrage etwas anderes auf,
      ist die Vorlage zu Ende und die Vorschläge haben übernommen: Bar hält an. */
+  /* Musik läuft nach dem letzten Lied bewusst weiter (Entscheidung des
+     Nutzers, 27.08.2026): Was Spotify danach anhängt, ist bei Musik kein
+     Ärgernis, sondern willkommen. Nur Geschichten und Podcasts müssen enden.
+
+     Das Abbestellen ist trotzdem nötig und darf nicht einfach entfallen:
+     Ohne diesen Aufruf bliebe der Auftrag des zuvor gestarteten Hörspiels
+     scharf – und die Aufsicht hielte dann jedes Lied an, weil es in der
+     Kapitelliste der Geschichte nicht vorkommt. */
+  function keineAufsicht(grund) {
+    if (App.auftrag) Log.info("Aufsicht abbestellt:", grund);
+    App.auftrag = null;
+  }
+
   function setzeAuftrag(tracks, merker, mitReihenfolge) {
     var erlaubt = {}, n = 0, letzte = null;
     for (var i = 0; i < (tracks || []).length; i++) {
@@ -3861,9 +3874,9 @@ var Player = (function () {
     App.auftrag = {
       erlaubt: erlaubt,
       // Der letzte Titel – das ist die eigentliche Sperre (Punkt AF). Er steht
-      // seit dem Einlesen im Cache, es braucht dafür keinen neuen Abruf. Nur
-      // wo die Reihenfolge feststeht: Eine gemischte Musikzeile hat keinen
-      // vorhersagbaren letzten Titel, dort bleibt es bei der Nachsorge.
+      // seit dem Einlesen im Cache, es braucht dafür keinen neuen Abruf.
+      // `mitReihenfolge` ist seit Punkt AG überall wahr, wo überhaupt noch
+      // ein Auftrag gesetzt wird: Musik bekommt gar keinen mehr.
       letzte: mitReihenfolge ? letzte : null,
       merker: merker || null,
       ab: Date.now()
@@ -4128,10 +4141,7 @@ var Player = (function () {
       // Tag mit demselben Lied. Ein einzelner Titel bleibt davon unberührt
       // (playPlaylistTrack schaltet aus), sonst käme das getippte Lied nicht.
       await sendPlay(dev, { context_uri: ctx }, "on");
-      // Auch die Musikzeile soll enden, wenn sie durch ist. Gemischt heißt nur
-      // andere Reihenfolge – die erlaubten Titel sind dieselben.
-      var plAll = App.cache && App.cache.playlists && App.cache.playlists[se.id];
-      setzeAuftrag((plAll && plAll.tracks) || [], null);
+      keineAufsicht("Musikzeile");
       Stats.start(sourceId);
       setPlaying(ctx, sourceId, null);
     },
@@ -4142,8 +4152,8 @@ var Player = (function () {
        §6.2 verbietet, einen Titel ISOLIERT ueber `uris` zu starten – danach
        waere Stille statt Weiterlauf. Hier wird nicht ein Titel uebergeben,
        sondern die ganze Restliste ab der getippten Stelle; sie laeuft also
-       durch. Nach dem letzten Lied ist Schluss, und das ist bei Musik richtig
-       so (die automatische Wiedergabe ist ohnehin abgeschaltet, §12).
+       durch. Was Spotify nach dem letzten Lied anhaengt, darf bei Musik laufen –
+       anders als bei einer Geschichte ist das dort kein Aergernis (Punkt AG).
 
        Spotify nimmt hoechstens 100 Eintraege entgegen. Laengere Listen werden
        fuer die Wiedergabe beschnitten – gespeichert bleiben alle. */
@@ -4164,7 +4174,7 @@ var Player = (function () {
       // Shuffle aus: sonst spielt Spotify die uebergebene Liste durcheinander
       // und das getippte Lied kaeme nicht zuerst.
       await sendPlay(dev, { uris: uris }, "off");
-      setzeAuftrag(uris, null, true);
+      keineAufsicht("Lieblingssongs");
       Stats.start(FAV_ID);
       setPlaying(null, FAV_ID, teil[0].uri);
     },
@@ -4185,7 +4195,7 @@ var Player = (function () {
       var dev = await ensureDevice(App.cfg);
       // Einzelner Titel: Shuffle aus, sonst kommt danach etwas Zufälliges.
       await sendPlay(dev, { context_uri: ctx, offset: { uri: trackUri } }, "off");
-      setzeAuftrag(liste, null, true);
+      keineAufsicht("einzelnes Lied");
       Stats.start(sourceId);
       setPlaying(ctx, sourceId, trackUri);
     }
@@ -6570,7 +6580,7 @@ async function copyLog(statusId) {
    Zahl an, die nichts mehr bedeutet – und genau dafür ist sie da: erkennen,
    ob nach einem Push schon der neue Stand geladen ist. Ablesen mit
    `git rev-list --count HEAD` (+1 für den Commit, der gerade entsteht). */
-var APP_VERSION = "v34";
+var APP_VERSION = "v35";
 
 async function boot() {
   var vb = $("verBadge");
