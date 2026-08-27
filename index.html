@@ -775,6 +775,105 @@ body.has-player #screenKid { padding-bottom: 150px; }
 #sleepInfo { margin-top: 12px; font-size: 13px; color: var(--hint); min-height: 18px; }
 
 /* ============================================================
+   Großer Player  (Punkt AH)
+   Ein Tipp auf das runde Cover in der Leiste zeigt das Bild groß. Der Zweck
+   ist das Anschauen – deshalb liegt das Cover QUADRATISCH vor, nicht rund
+   wie in der Leiste: Der Kreis schneidet die Ecken der Bildgestaltung ab,
+   und genau die will das Kind hier sehen. Aus demselben Grund dreht es sich
+   hier nicht.
+   ============================================================ */
+#bigPlayer {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 50;                    /* über der Leiste (40), unter Fehler (60) */
+  background: var(--bg);
+  display: none;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+#bigPlayer.is-on { display: block; }
+#bigPlayer .bp-inner {
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 8px 20px 28px 20px;
+  text-align: center;
+}
+/* Schließen oben links, weil dort auch in der Kinderansicht der Zurück-Pfeil
+   sitzt. Ein Kind lernt eine Stelle, nicht zwei. */
+#bigPlayer .bp-close {
+  display: block;
+  width: 56px; height: 56px;
+  margin: 0 auto 0 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+#bigPlayer .bp-art {
+  width: 100%;
+  max-width: 420px;
+  margin: 4px auto 20px auto;
+  border-radius: 20px;
+  overflow: hidden;
+  background: var(--surface-2);
+  position: relative;
+  padding-top: 0;
+}
+/* Quadratisch über padding-top statt aspect-ratio – dasselbe wie bei der
+   Kachel, aspect-ratio ist für Chrome 106 zu neu. */
+#bigPlayer .bp-art .sq { width: 100%; padding-top: 100%; position: relative; }
+#bigPlayer .bp-art img {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  display: block;
+}
+#bigPlayer .bp-title {
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--text);
+  margin: 0 0 22px 0;
+  /* Lange Hörspieltitel dürfen umbrechen, aber nicht die Knöpfe wegschieben. */
+  max-height: 60px;
+  overflow: hidden;
+}
+/* Unter dem Kapitelnamen steht, zu welcher Geschichte es gehört. Der Titel
+   allein („Kapitel 3") sagt einem Kind nichts. */
+#bigPlayer .bp-sub {
+  font-size: 16px;
+  line-height: 1.3;
+  color: var(--text-dim);
+  margin: -14px 0 22px 0;
+  max-height: 42px;
+  overflow: hidden;
+}
+#bigPlayer .bp-sub:empty { margin: 0 0 4px 0; }
+#bigPlayer .bp-prog { display: flex; align-items: center; margin-bottom: 18px; }
+#bigPlayer .bp-prog .t {
+  flex: 0 0 auto;
+  min-width: 52px;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  color: var(--hint);
+}
+#bigPlayer .bp-prog .track {
+  flex: 1 1 auto;
+  height: 8px;
+  margin: 0 12px;
+  border-radius: 4px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+#bigPlayer .bp-prog .fill { height: 100%; width: 0; background: var(--accent); }
+#bigPlayer .bp-btns { display: flex; align-items: center; justify-content: center; }
+#bigPlayer .bp-btns .p-btn { margin: 0 8px; }
+/* Der große Wiedergabeknopf: noch einmal größer als in der Leiste. Er ist auf
+   diesem Bildschirm die Hauptsache. */
+#bigPlayer .p-btn.big { width: 86px; height: 86px; }
+
+/* ============================================================
    Statistik  (Punkt AE)
    Balken aus schlichten Divs statt einer Diagrammbibliothek: Die Seite ist
    eine einzelne Datei ohne Netzabhängigkeiten, und ein paar Prozentbreiten
@@ -1378,6 +1477,44 @@ body.has-player #screenKid { padding-bottom: 150px; }
     </div>
   </div>
   <div class="p-title" id="pTitle"></div>
+</div>
+
+<!-- Großer Player (Punkt AH) -->
+<div id="bigPlayer">
+  <div class="bp-inner">
+    <button class="bp-close tap" id="bpClose" aria-label="Schließen">
+      <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M6 9l6 6 6-6"/>
+      </svg>
+    </button>
+    <div class="bp-art"><div class="sq"><img id="bpImg" alt=""></div></div>
+    <div class="bp-title" id="bpTitle"></div>
+    <div class="bp-sub" id="bpSub"></div>
+    <div class="bp-prog">
+      <span class="t" id="bpElapsed">0:00</span>
+      <div class="track"><div class="fill" id="bpFill"></div></div>
+      <span class="t" id="bpRemain">0:00</span>
+    </div>
+    <div class="bp-btns">
+      <button class="p-btn fav" id="bpFav" title="Lieblingssong"></button>
+      <button class="p-btn" id="bpPrev" title="Vorheriger">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M7 6h2v12H7z"/><path d="M19 6v12l-9-6z"/>
+        </svg>
+      </button>
+      <button class="p-btn big" id="bpPlay" title="Wiedergabe">
+        <svg width="46" height="46" viewBox="0 0 24 24" fill="currentColor" id="bpPlayIcon">
+          <path d="M7 5v14l12-7z"/>
+        </svg>
+      </button>
+      <button class="p-btn" id="bpNext" title="Nächster">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M15 6h2v12h-2z"/><path d="M5 6v12l9-6z"/>
+        </svg>
+      </button>
+    </div>
+  </div>
 </div>
 
 <div id="sleepSheet">
@@ -2481,10 +2618,26 @@ var Sync = (function () {
     return cache;
   }
 
+  /* Fürs Kachelraster ist das 300er richtig – klein, schnell, überall gleich.
+     Im großen Player wäre es sichtbar weich. Spotify liefert im selben
+     Datensatz auch 640 px mit; das kostet keinen zweiten Abruf, weil die
+     Liste ohnehin schon da ist. Gespeichert wird davon nichts: Der große
+     Player liest sie direkt aus der laufenden Antwort (Punkt AH). */
+  function pickImageBig(images) {
+    if (!images || !images.length) return null;
+    var best = null, bestW = -1;
+    for (var i = 0; i < images.length; i++) {
+      var w = (images[i] && images[i].width) || 0;
+      if (w > bestW) { bestW = w; best = images[i]; }
+    }
+    return (best && best.url) || pickImage(images);
+  }
+
   return {
     MAX_AGE_MS: MAX_AGE_MS,
     extractPlaylistId: extractPlaylistId,
     pickImage: pickImage,
+    pickImageBig: pickImageBig,
     tidyConfig: tidyConfig,
     run: run,
     isStale: function (cache) {
@@ -4227,12 +4380,20 @@ var Bar = (function () {
      jeder Abfrage wird wieder auf den echten Wert gesetzt, das zählt hier
      korrigiert sich also selbst. */
   function paintProgress() {
-    var e = $("pElapsed"), r = $("pRemain"), f = $("pFill");
-    if (!e || !r || !f) return;
     var pos = Math.max(0, Math.min(posMs, durMs || 0));
-    e.textContent = fmtDur(pos);
-    r.textContent = durMs ? "−" + fmtDur(Math.max(0, durMs - pos)) : "0:00";
-    f.style.width = durMs ? (Math.round((pos / durMs) * 1000) / 10) + "%" : "0%";
+    var verstrichen = fmtDur(pos);
+    var rest = durMs ? "−" + fmtDur(Math.max(0, durMs - pos)) : "0:00";
+    var breite = durMs ? (Math.round((pos / durMs) * 1000) / 10) + "%" : "0%";
+    // Beide Zeilen aus derselben Rechnung, damit sie nie auseinanderlaufen:
+    // Die Leiste und der große Player zeigen dieselbe Wiedergabe.
+    var paare = [["pElapsed", "pRemain", "pFill"], ["bpElapsed", "bpRemain", "bpFill"]];
+    for (var i = 0; i < paare.length; i++) {
+      var e = $(paare[i][0]), r = $(paare[i][1]), f = $(paare[i][2]);
+      if (!e || !r || !f) continue;
+      e.textContent = verstrichen;
+      r.textContent = rest;
+      f.style.width = breite;
+    }
   }
 
   function stopTick() { if (tick) { clearInterval(tick); tick = null; } }
@@ -4260,15 +4421,19 @@ var Bar = (function () {
      abzuspielen widerspricht §6.2. Dann bleibt der Platz leer statt einen
      Knopf anzubieten, der nichts tut. */
   function paintFav(state) {
-    var el = $("pFav");
+    var el = $("pFav"), elb = $("bpFav");
     if (!el) return;
+    function beide(inhalt, klasse) {
+      el.innerHTML = inhalt;
+      el.className = klasse;
+      if (elb) { elb.innerHTML = inhalt; elb.className = klasse; }
+    }
     var it = state && state.item;
     var ctx = (state && state.context && state.context.uri) || null;
     var geschichte = !!(ctx && ctx.indexOf("spotify:album:") === 0);
     if (!it || !it.uri || geschichte) {
       favTrack = null;
-      el.innerHTML = "";
-      el.className = "p-btn fav";
+      beide("", "p-btn fav");
       return;
     }
     favTrack = {
@@ -4278,12 +4443,20 @@ var Bar = (function () {
       image: (it.album && Sync.pickImage(it.album.images)) || null
     };
     var on = isFav(it.uri);
-    el.innerHTML = on ? SVG_HEART_BIG_FULL : SVG_HEART_BIG;
-    el.className = "p-btn fav" + (on ? " on" : "");
+    beide(on ? SVG_HEART_BIG_FULL : SVG_HEART_BIG, "p-btn fav" + (on ? " on" : ""));
   }
 
   function currentFavTrack() { return favTrack; }
 
+
+  /* Das große Bild hat keine Drehung und deshalb auch nicht das Problem mit
+     der stehenbleibenden Textur – hier genügt ein schlichter Tausch. */
+  function setCoverBig(url) {
+    var el = $("bpImg");
+    if (!el || !el.setAttribute) return;
+    if (el.getAttribute("src") === url) return;
+    el.setAttribute("src", url || "");
+  }
 
   function setCover(url, spinning) {
     var pImg = $("pImg"), c = $("pCover");
@@ -4331,6 +4504,8 @@ var Bar = (function () {
     lastAt = Date.now();
     if (!state || !state.item) {
       showBar(false);
+      // Läuft nichts mehr, hat der große Player nichts mehr zu zeigen.
+      if (typeof BigPlayer !== "undefined" && BigPlayer) BigPlayer.zu();
       running = false;
       stopTick();
       paintFav(null);
@@ -4344,7 +4519,18 @@ var Bar = (function () {
     var img = (it.album && Sync.pickImage(it.album.images)) ||
               (it.images && Sync.pickImage(it.images)) || null;
     setCover(img, !!state.is_playing);
+    // Für den großen Player das größte mitgelieferte Bild, sonst das kleine.
+    setCoverBig((it.album && Sync.pickImageBig(it.album.images)) ||
+                (it.images && Sync.pickImageBig(it.images)) || img);
     var t = $("pTitle"); if (t) t.textContent = it.name || "";
+    var tb = $("bpTitle"); if (tb) tb.textContent = it.name || "";
+    // Bei einer Podcast-Folge heißen Folge und Serie oft gleich – dann bliebe
+    // die Zeile eine Dopplung und wird weggelassen.
+    var sb = $("bpSub");
+    if (sb) {
+      var werk = (it.album && it.album.name) || (it.show && it.show.name) || "";
+      sb.textContent = (werk && werk !== it.name) ? werk : "";
+    }
 
     paintFav(state);
 
@@ -4353,12 +4539,13 @@ var Bar = (function () {
     running = !!state.is_playing;
     paintProgress();
     if (running) startTick(); else stopTick();
+    var symbol = state.is_playing
+      ? '<path d="M7 5h4v14H7z"/><path d="M13 5h4v14h-4z"/>'
+      : '<path d="M7 5v14l12-7z"/>';
     var pi = $("pPlayIcon");
-    if (pi) {
-      pi.innerHTML = state.is_playing
-        ? '<path d="M7 5h4v14H7z"/><path d="M13 5h4v14h-4z"/>'
-        : '<path d="M7 5v14l12-7z"/>';
-    }
+    if (pi) pi.innerHTML = symbol;
+    var pib = $("bpPlayIcon");
+    if (pib) pib.innerHTML = symbol;
     var ctx = (state.context && state.context.uri) || null;
     var id = null;
     if (ctx && ctx.indexOf("spotify:album:") === 0) id = ctx.slice(14);
@@ -4628,7 +4815,7 @@ var Bar = (function () {
      Titel zu weit. Weitere Tipps werden verworfen, nicht gesammelt. */
   function setBusy(on) {
     busy = on;
-    var ids = ["pPrev", "pNext"];
+    var ids = ["pPrev", "pNext", "bpPrev", "bpNext"];
     for (var i = 0; i < ids.length; i++) {
       var el = $(ids[i]);
       if (el) el.className = on ? "p-btn is-busy" : "p-btn";
@@ -5671,6 +5858,15 @@ function closeSleep() {
 }
 
 var toastTimer = null;
+/* Über den Verlauf schließen, nicht direkt: Sonst bliebe der beim Öffnen
+   gesetzte Eintrag stehen, und die Zurück-Taste des Tablets bräuchte danach
+   zwei Anläufe. Dieselbe Überlegung wie bei `navBack`. */
+function schliesseBigPlayer() {
+  if (!BigPlayer.offen()) return;
+  try { window.history.back(); }
+  catch (e) { BigPlayer.zu(); }
+}
+
 function toast(text) {
   var el = $("toast");
   if (!el) return;
@@ -5679,6 +5875,42 @@ function toast(text) {
   if (toastTimer) clearTimeout(toastTimer);
   toastTimer = setTimeout(function () { el.className = ""; }, 1800);
 }
+
+/* --------------------- Großer Player  (Punkt AH) ------------------------
+   Ein Tipp auf das kleine runde Cover in der Leiste zeigt das Bild groß.
+   Gewünscht war das ausdrücklich fürs Kind: Das Cover ist bei einem Hörspiel
+   das Einzige, was es lesen kann.
+
+   Kein eigener Bildschirm über `show()`, sondern ein Overlay: Die Leiste
+   bleibt darunter am Leben, die Abfrage läuft weiter, und beim Schließen ist
+   die Kachelansicht sofort wieder da, ohne Neuaufbau und ohne verlorene
+   Scrollstelle. */
+var BigPlayer = (function () {
+  function el() { return $("bigPlayer"); }
+
+  return {
+    offen: function () { var o = el(); return !!(o && String(o.className).indexOf("is-on") >= 0); },
+
+    auf: function () {
+      var o = el();
+      if (!o) return;
+      // Ohne laufende Wiedergabe gibt es nichts zu zeigen.
+      if (!Bar.state() || !Bar.state().item) return;
+      if (this.offen()) return;
+      o.className = "is-on";
+      // Eigener Verlaufseintrag, damit die Zurück-Taste des Tablets ihn
+      // schließt statt aus der Ansicht zu führen – wie bei den Ordnern.
+      histPush();
+      Log.info("Großer Player geöffnet.");
+    },
+
+    zu: function () {
+      var o = el();
+      if (!o || !this.offen()) return;
+      o.className = "";
+    }
+  };
+})();
 
 /* ------------------------- Statistik  (Punkt AE) -------------------------
    Gezählt wird in Summen, nicht als Ereignisliste. Der Grund ist der Platz:
@@ -6428,6 +6660,22 @@ function wire() {
     });
   })();
 
+  /* Tipp auf das runde Cover öffnet den großen Player (Punkt AH). */
+  $("pCover").addEventListener("click", function () { BigPlayer.auf(); });
+  $("bpClose").addEventListener("click", function () { schliesseBigPlayer(); });
+  // Tipp neben die Karte schließt ebenfalls. Bewusst nur der Hintergrund
+  // selbst: Ein Tipp auf Bild, Titel oder Knopf darf nichts zumachen.
+  $("bigPlayer").addEventListener("click", function (e) {
+    if (e && e.target === this) schliesseBigPlayer();
+  });
+  $("bpPlay").addEventListener("click", function () { guard(function () { return Bar.toggle(); }); });
+  $("bpNext").addEventListener("click", function () { guard(function () { return Bar.next(); }); });
+  $("bpPrev").addEventListener("click", function () { guard(function () { return Bar.prev(); }); });
+  $("bpFav").addEventListener("click", function () {
+    var tr = Bar.currentFavTrack();
+    if (tr) guard(function () { return favToggleTrack(tr); });
+  });
+
   $("pPlay").addEventListener("click", function () { guard(function () { return Bar.toggle(); }); });
   $("pNext").addEventListener("click", function () { guard(function () { return Bar.next(); }); });
   $("pPrev").addEventListener("click", function () { guard(function () { return Bar.prev(); }); });
@@ -6439,7 +6687,11 @@ function wire() {
     var bar = $("player");
     function isControl(node) {
       while (node && node !== bar) {
-        if (node.className && String(node.className).indexOf("p-btn") >= 0) return true;
+        var k = String((node && node.className) || "");
+        // Das Cover hat seit Punkt AH eine eigene Bedeutung. Zwei Gesten auf
+        // derselben Fläche – kurz großer Player, lang Einschlaftimer – wären
+        // für niemanden zu erraten. Der Rest der Leiste bleibt der Timer.
+        if (k.indexOf("p-btn") >= 0 || k.indexOf("p-cover") >= 0) return true;
         node = node.parentNode;
       }
       return false;
@@ -6508,6 +6760,8 @@ function wire() {
 
   // Zurück-Taste des Tablets: eine Ebene zurück statt aus der App heraus.
   window.addEventListener("popstate", function () {
+    // Der große Player liegt über allem und geht als Erstes zu.
+    if (BigPlayer.offen()) { BigPlayer.zu(); return; }
     if (App.screen !== "screenKid") { histPush(); return; }
     if (View.stack.length) { View.stack.pop(); renderKid(); }
     else histPush();          // auf Ebene 1 wird die Taste geschluckt
@@ -6580,7 +6834,7 @@ async function copyLog(statusId) {
    Zahl an, die nichts mehr bedeutet – und genau dafür ist sie da: erkennen,
    ob nach einem Push schon der neue Stand geladen ist. Ablesen mit
    `git rev-list --count HEAD` (+1 für den Commit, der gerade entsteht). */
-var APP_VERSION = "v35";
+var APP_VERSION = "v36";
 
 async function boot() {
   var vb = $("verBadge");
