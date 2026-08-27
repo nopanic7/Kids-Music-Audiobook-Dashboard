@@ -446,6 +446,33 @@ textarea { min-height: 120px; font-family: monospace; font-size: 12px; line-heig
 }
 .tile .list-btn svg { position: absolute; top: 9px; left: 9px; }
 
+/* Hörstand (Punkt AC): Balken am unteren Rand des Bildes.
+   Bewusst NICHT bernsteinfarben – Bernstein heißt „läuft gerade", und zwei
+   Bedeutungen für eine Farbe ist genau der Fehler, den die Bernstein-Regel
+   in DESIGN.md verbietet. Ein heller neutraler Balken auf dunklem Grund
+   trägt keine zweite Bedeutung und ist auf jedem Cover zu sehen. */
+.tile .hoer {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 7px;
+  background: rgba(21, 26, 36, 0.6);
+  z-index: 2;
+}
+.tile .hoer.is-empty { display: none; }
+.tile .hoer i {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--text-dim);
+}
+/* Durchgehört: satter und ohne Rest, damit „fast fertig" und „fertig" aus
+   zwei Metern Entfernung nicht gleich aussehen. */
+.tile .hoer.is-full i { background: var(--text); }
+/* Auf der laufenden (bernsteinfarbenen) Karte braucht der Balken den
+   Gegenton, sonst verschwindet Hellgrau in Bernstein. */
+.tile.is-playing .hoer { background: rgba(65, 36, 2, 0.28); }
+.tile.is-playing .hoer i { background: var(--on-accent); }
+
 /* Kapitel-Kacheln: große Ziffer statt Cover (§5.2, Ziffer vergrößert) */
 .tile.chapter .box { background: var(--surface); border-color: var(--border); }
 .tile.chapter.is-playing .box { border-color: var(--accent); }
@@ -746,6 +773,119 @@ body.has-player #screenKid { padding-bottom: 150px; }
 }
 .sleep-opts button.is-on { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 #sleepInfo { margin-top: 12px; font-size: 13px; color: var(--hint); min-height: 18px; }
+
+/* ============================================================
+   Statistik  (Punkt AE)
+   Balken aus schlichten Divs statt einer Diagrammbibliothek: Die Seite ist
+   eine einzelne Datei ohne Netzabhängigkeiten, und ein paar Prozentbreiten
+   erklären dieselbe Sache.
+   ============================================================ */
+.stat-sum {
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text-dim);
+  margin: 0 0 4px 0;
+}
+.stat-sum b { color: var(--text); font-weight: 600; }
+.stat-row { display: flex; align-items: center; margin-bottom: 9px; }
+.stat-row .nm {
+  flex: 0 0 42%;
+  font-size: 14px;
+  color: var(--text);
+  padding-right: 10px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.stat-row .bar {
+  flex: 1 1 auto;
+  height: 14px;
+  background: var(--surface-2);
+  border-radius: 7px;
+  overflow: hidden;
+}
+.stat-row .bar i { display: block; height: 100%; width: 0; background: var(--text-dim); }
+.stat-row .val {
+  flex: 0 0 92px;
+  text-align: right;
+  font-size: 12px;
+  color: var(--hint);
+  padding-left: 10px;
+}
+/* Stundenraster: 24 Säulen. Kein flex-gap – der fehlt in älteren WebViews,
+   und dann klebten die Säulen aneinander. Ränder tun es überall. */
+.stat-cols { display: flex; align-items: flex-end; height: 120px; }
+.stat-cols .c {
+  flex: 1 1 0;
+  margin: 0 1px;
+  height: 100%;
+  position: relative;
+  background: var(--surface-2);
+  border-radius: 3px 3px 0 0;
+}
+.stat-cols .c i {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  background: var(--text-dim);
+  border-radius: 3px 3px 0 0;
+}
+/* Die Spitze markiert die Stunde, in der am meisten gehört wird – die
+   eigentliche Frage an dieses Bild. */
+.stat-cols .c.top i { background: var(--accent); }
+.stat-axis { display: flex; margin-top: 6px; }
+.stat-axis span {
+  flex: 1 1 0;
+  margin: 0 1px;
+  text-align: center;
+  font-size: 10px;
+  color: var(--hint);
+  overflow: hidden;
+}
+.stat-empty { color: var(--hint); font-size: 14px; }
+
+/* ============================================================
+   Rückfrage vor dem Zurücksetzen  (Punkt AD)
+   Eigenes Overlay statt confirm(): Ein Systemdialog ist in Fully Kiosk nicht
+   verlässlich und für ein Kind auch viel zu klein.
+   ============================================================ */
+#askOverlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(21, 26, 36, 0.93);
+  z-index: 70;
+  display: none;
+  text-align: center;
+  padding: 24px;
+}
+#askOverlay.is-on { display: block; }
+#askOverlay .inner { max-width: 440px; margin: 0 auto; padding-top: 20vh; }
+#askOverlay .msg {
+  font-size: 21px;
+  line-height: 1.4;
+  color: var(--text);
+  margin: 0 0 10px 0;
+}
+#askOverlay .sub {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--hint);
+  margin: 0 0 28px 0;
+}
+#askOverlay button {
+  display: block;
+  width: 100%;
+  min-height: 60px;
+  margin: 0 0 12px 0;
+  padding: 14px 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-tile);
+  background: var(--surface-2);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 18px;
+  cursor: pointer;
+}
+#askOverlay button.ja { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 
 /* ============================================================
    Fehlerbildschirm  (Spec §10) – als Overlay, Entscheidung zu F10
@@ -1142,6 +1282,18 @@ body.has-player #screenKid { padding-bottom: 150px; }
     </div>
 
     <div class="card">
+      <h2>Hören</h2>
+      <p class="hint">Die Hörbox merkt sich bei jeder Geschichte, wo sie
+         stehengeblieben ist. Zurückgesetzt fängt sie wieder von vorn an.
+         Einzeln geht das auch in der Kinderansicht: lange auf eine Kachel
+         oder einen Ordner drücken.</p>
+      <div id="progInfo" class="status"></div>
+      <button class="btn block" id="btnStats">Statistik ansehen</button>
+      <button class="btn danger block" id="btnProgReset" style="margin-top:10px">Alle Hörpositionen zurücksetzen</button>
+      <div id="progStatus" class="status"></div>
+    </div>
+
+    <div class="card">
       <h2>Sicherung</h2>
       <p class="hint">Text markieren und kopieren. Zum Zurückspielen hier
          einfügen und „Einlesen" drücken.</p>
@@ -1165,6 +1317,25 @@ body.has-player #screenKid { padding-bottom: 150px; }
       <textarea id="logBox2" class="selectable" readonly spellcheck="false"></textarea>
     </div>
 
+  </div>
+</section>
+
+<!-- ================= Statistik (Punkt AE) ================= -->
+<section id="screenStats" class="screen">
+  <div class="pad">
+    <div class="row" style="justify-content:space-between; align-items:center">
+      <h1 style="margin:0">Statistik</h1>
+      <button class="btn ghost" id="btnStatsClose">Zurück</button>
+    </div>
+    <hr class="divider">
+    <div id="statsBody"></div>
+    <div class="card">
+      <h2>Zählung zurücksetzen</h2>
+      <p class="hint">Löscht nur die Statistik. Hörpositionen, Quellen und
+         Lieblingssongs bleiben unberührt.</p>
+      <button class="btn danger block" id="btnStatsReset">Statistik zurücksetzen</button>
+      <div id="statsStatus" class="status"></div>
+    </div>
   </div>
 </section>
 
@@ -1226,6 +1397,15 @@ body.has-player #screenKid { padding-bottom: 150px; }
   <canvas id="waitCanvas"></canvas>
   <div id="waitTitle">Die Musik kommt gleich …</div>
   <div id="waitHint">Tippe, um zu springen</div>
+</div>
+
+<div id="askOverlay">
+  <div class="inner">
+    <p class="msg" id="askMsg"></p>
+    <p class="sub" id="askSub"></p>
+    <button class="ja tap" id="btnAskYes">Von vorn anfangen</button>
+    <button class="tap" id="btnAskNo">Abbrechen</button>
+  </div>
 </div>
 
 <div id="errOverlay">
@@ -1352,6 +1532,7 @@ var Store = (function () {
     config:   "hoerbox.config.v1",
     cache:    "hoerbox.cache.v1",
     progress: "hoerbox.progress.v1",
+    stats:    "hoerbox.stats.v1",
     auth:     "hoerbox.auth.v1"
   };
 
@@ -1443,6 +1624,9 @@ var Store = (function () {
 
     async loadProgress() { return read(KEY.progress, {}); },
     async saveProgress(p) { return write(KEY.progress, p); },
+
+    async loadStats() { return read(KEY.stats, null); },
+    async saveStats(st) { return write(KEY.stats, st); },
 
     normalizeConfig: normalizeConfig,
 
@@ -2319,6 +2503,7 @@ var App = {
   screen: null,
   syncing: false,
   playing: null,
+  auftrag: null,             // was die Hörbox selbst gestartet hat (Punkt AB)
   progress: null,
   editGroup: null,
   editSrcCover: null,        // welche Ordner-Quelle gerade ihr Cover waehlt
@@ -2530,6 +2715,127 @@ async function refreshAuthState() {
   }
 }
 
+/* Die Statistikseite. Drei Fragen, drei Blöcke: Was wurde gehört, wann am
+   Tag, und wie verteilt sich das über die letzten zwei Wochen. */
+function renderStats() {
+  var el = $("statsBody");
+  if (!el) return;
+  var st = Stats.daten();
+  if (!st) { el.innerHTML = '<div class="card"><p class="stat-empty">Noch nichts gezählt.</p></div>'; return; }
+
+  var ids = Object.keys(st.titel), i;
+  var gesamt = 0, starts = 0;
+  for (i = 0; i < ids.length; i++) {
+    gesamt += st.titel[ids[i]].ms || 0;
+    starts += st.titel[ids[i]].starts || 0;
+  }
+
+  var html = '<div class="card"><h2>Überblick</h2>';
+  if (!gesamt && !starts) {
+    html += '<p class="stat-empty">Noch nichts gezählt. Sobald etwas läuft, ' +
+            'füllt sich diese Seite von allein.</p></div>';
+    el.innerHTML = html;
+    return;
+  }
+  var seit = new Date(st.seit || Date.now());
+  html += '<p class="stat-sum">Insgesamt <b>' + esc(fmtStd(gesamt)) + '</b> gehört, ' +
+          '<b>' + starts + '</b> mal etwas gestartet.</p>' +
+          '<p class="stat-sum">Gezählt seit ' + esc(seit.toLocaleDateString("de-DE")) + '.</p>' +
+          '</div>';
+
+  // --- Was wurde am meisten gehört? ---------------------------------------
+  ids.sort(function (a, b) { return (st.titel[b].ms || 0) - (st.titel[a].ms || 0); });
+  var oben = ids.slice(0, 15);
+  var max = oben.length ? (st.titel[oben[0]].ms || 0) : 0;
+  html += '<div class="card"><h2>Am meisten gehört</h2>';
+  if (!max) {
+    html += '<p class="stat-empty">Noch keine Hörzeit gezählt.</p>';
+  } else {
+    for (i = 0; i < oben.length; i++) {
+      var e = st.titel[oben[i]];
+      var breite = max ? Math.round(((e.ms || 0) / max) * 1000) / 10 : 0;
+      html += '<div class="stat-row">' +
+                '<span class="nm">' + esc(e.name || oben[i]) + '</span>' +
+                '<span class="bar"><i style="width:' + breite + '%"></i></span>' +
+                '<span class="val">' + esc(fmtStd(e.ms || 0)) + ' · ' + (e.starts || 0) + '×</span>' +
+              '</div>';
+    }
+  }
+  html += '</div>';
+
+  // --- Zu welcher Uhrzeit? -------------------------------------------------
+  var hmax = 0, h;
+  for (h = 0; h < 24; h++) if (st.stunden[h] > hmax) hmax = st.stunden[h];
+  html += '<div class="card"><h2>Zu welcher Uhrzeit</h2>';
+  if (!hmax) {
+    html += '<p class="stat-empty">Noch keine Hörzeit gezählt.</p>';
+  } else {
+    html += '<div class="stat-cols">';
+    for (h = 0; h < 24; h++) {
+      var hh = hmax ? Math.round((st.stunden[h] / hmax) * 1000) / 10 : 0;
+      html += '<div class="c' + (st.stunden[h] === hmax ? " top" : "") +
+              '"><i style="height:' + hh + '%"></i></div>';
+    }
+    html += '</div><div class="stat-axis">';
+    // Nicht alle 24 Zahlen: Auf der Tabletbreite überlappen sie sonst.
+    for (h = 0; h < 24; h++) html += '<span>' + (h % 3 === 0 ? h : "") + '</span>';
+    html += '</div>';
+    var spitze = 0;
+    for (h = 0; h < 24; h++) if (st.stunden[h] === hmax) { spitze = h; break; }
+    html += '<p class="stat-sum" style="margin-top:12px">Am häufigsten zwischen <b>' +
+            spitze + ' und ' + ((spitze + 1) % 24) + ' Uhr</b>.</p>';
+  }
+  html += '</div>';
+
+  // --- Die letzten 14 Tage -------------------------------------------------
+  var tage = [], tmax = 0;
+  var d0 = new Date();
+  for (i = 13; i >= 0; i--) {
+    var d = new Date(d0.getFullYear(), d0.getMonth(), d0.getDate() - i);
+    var k = Stats.tagesschluessel(d);
+    var v = st.tage[k] || 0;
+    if (v > tmax) tmax = v;
+    tage.push({ d: d, v: v });
+  }
+  html += '<div class="card"><h2>Letzte 14 Tage</h2>';
+  if (!tmax) {
+    html += '<p class="stat-empty">In den letzten zwei Wochen wurde nichts gehört.</p>';
+  } else {
+    html += '<div class="stat-cols">';
+    for (i = 0; i < tage.length; i++) {
+      var th = Math.round((tage[i].v / tmax) * 1000) / 10;
+      html += '<div class="c"><i style="height:' + th + '%"></i></div>';
+    }
+    html += '</div><div class="stat-axis">';
+    for (i = 0; i < tage.length; i++) html += '<span>' + tage[i].d.getDate() + '</span>';
+    html += '</div>';
+  }
+  html += '</div>';
+
+  el.innerHTML = html;
+}
+
+async function openStats() {
+  await Stats.jetztSichern();
+  renderStats();
+  setStatus("statsStatus", "");
+  show("screenStats");
+}
+
+/* Wie viele Geschichten sind angefangen? Ohne diese Zahl wäre der
+   Zurücksetzen-Knopf ein Sprung ins Dunkle. */
+function renderProgInfo() {
+  var el = $("progInfo");
+  if (!el) return;
+  var n = merkerAnzahl(), fertig = 0;
+  var keys = App.progress ? Object.keys(App.progress) : [];
+  for (var i = 0; i < keys.length; i++) if (App.progress[keys[i]] && App.progress[keys[i]].fertig) fertig++;
+  if (!n) { el.textContent = "Es ist nichts gemerkt."; el.className = "status"; return; }
+  el.textContent = n + (n === 1 ? " Geschichte gemerkt" : " Geschichten gemerkt") +
+                   (fertig ? " – davon " + fertig + " durchgehört." : ".");
+  el.className = "status";
+}
+
 async function openAdmin() {
   var inp = $("inpClientId2");
   if (inp) inp.value = App.cfg.clientId || "";
@@ -2537,6 +2843,7 @@ async function openAdmin() {
   setStatus("authStatus", "");
   setStatus("srcStatus", "");
   App.pendingRemove = null;
+  renderProgInfo();
   renderAdmin();
   show("screenAdmin");
   refreshAuthState();
@@ -3535,6 +3842,32 @@ var Player = (function () {
     return dev;
   }
 
+  /* Punkt AB – Spotifys automatische Wiedergabe hängt nach dem letzten Titel
+     eigene Vorschläge an. In der Spotify-App auf dem Tablet lässt sie sich
+     nicht abschalten – §12, Schritt 7 der Einrichtung geht dort ins Leere –,
+     und die Web-API kennt keinen Schalter dafür. Also merkt sich die Hörbox,
+     was sie selbst gestartet hat. Taucht in der Abfrage etwas anderes auf,
+     ist die Vorlage zu Ende und die Vorschläge haben übernommen: Bar hält an. */
+  function setzeAuftrag(tracks, merker) {
+    var erlaubt = {}, n = 0;
+    for (var i = 0; i < (tracks || []).length; i++) {
+      var u = typeof tracks[i] === "string" ? tracks[i] : (tracks[i] && tracks[i].uri);
+      if (u && !erlaubt[u]) { erlaubt[u] = true; n++; }
+    }
+    // Ohne Titelliste lieber gar keine Aufsicht als eine, die falsch anhält.
+    App.auftrag = n ? { erlaubt: erlaubt, merker: merker || null, ab: Date.now() } : null;
+  }
+
+  /* Steht der Merker in den letzten Sekunden des letzten Titels, ist er
+     verbraucht: Fortsetzen brächte drei Sekunden Ton und danach wieder die
+     Vorschläge. Der nächste Tipp auf die Kachel fängt dann von vorn an. */
+  var RESTSEK = 3000;
+  function merkerVerbraucht(p, track) {
+    var laenge = (track && track.ms) || 0;
+    var stelle = (p && p.positionMs) || 0;
+    return laenge > 0 && stelle >= laenge - RESTSEK;
+  }
+
   /* Reihenfolge aus §6.2. `shuffle` ist dreiwertig: "off" schaltet ausdrücklich
      ab, "on" ausdrücklich an, "keep" lässt den Zustand in Ruhe. Vorher stand
      hier ein boolesches „isStory", das nur zwischen aus und unangetastet
@@ -3631,7 +3964,11 @@ var Player = (function () {
         var p = progress && progress[album.id];
         // Anders als beim Album ist die Folge immer dieselbe – nur die Stelle
         // darin muss gemerkt werden, kein trackUri-Abgleich nötig.
-        if (p && p.positionMs) {
+        if (p && p.fertig) {
+          Log.info("Folge ist durchgehört – starte von vorn.");
+        } else if (p && p.positionMs && merkerVerbraucht(p, folge)) {
+          Log.info("Folge war durchgehört – starte von vorn.");
+        } else if (p && p.positionMs) {
           body.position_ms = p.positionMs;
           Log.info("Setze Folge fort bei", Math.round(p.positionMs / 1000) + " s");
         }
@@ -3644,6 +3981,8 @@ var Player = (function () {
 
       var dev = await ensureDevice(App.cfg);
       await sendPlay(dev, body, "off");
+      setzeAuftrag([folge.uri], album.id);
+      Stats.start(album.id);
       // Ohne Kontext gibt es nichts, woran die Oberflaeche die Kachel erkennt –
       // deshalb die Kachel-ID selbst festhalten.
       setPlaying(null, album.id, folge.uri);
@@ -3664,10 +4003,21 @@ var Player = (function () {
           setPlaying(ctx, albumId, state.item && state.item.uri);
           return;
         }
-        Log.info("Album ist pausiert – setze fort.");
-        await this.resumeHere();
-        setPlaying(ctx, albumId, state.item && state.item.uri);
-        return;
+        // Am Ende stehengeblieben? Dann ist Fortsetzen sinnlos: Es kämen ein
+        // paar Sekunden Ton und danach wieder Spotifys Vorschläge. Der Tipp
+        // auf die Kachel soll dann von vorn anfangen (Punkt AB).
+        var letzter = album.tracks[album.tracks.length - 1];
+        var amEnde = !!(letzter && state.item && state.item.uri === letzter.uri &&
+                        merkerVerbraucht({ positionMs: state.progress_ms || 0 },
+                                         { ms: state.item.duration_ms || letzter.ms }));
+        if (!amEnde) {
+          Log.info("Album ist pausiert – setze fort.");
+          await this.resumeHere();
+          setPlaying(ctx, albumId, state.item && state.item.uri);
+          return;
+        }
+        Log.info("Album steht am Ende – starte von vorn.");
+        fromStart = true;
       }
 
       var body = { context_uri: ctx };
@@ -3676,16 +4026,22 @@ var Player = (function () {
         var progress = await Store.loadProgress();
         var p = progress && progress[ctx];
         if (p && p.trackUri) {
-          var stillThere = false;
+          var idx = -1;
           for (var i = 0; i < album.tracks.length; i++) {
-            if (album.tracks[i].uri === p.trackUri) { stillThere = true; break; }
+            if (album.tracks[i].uri === p.trackUri) { idx = i; break; }
           }
-          if (stillThere) {
+          if (p.fertig) {
+            Log.info("Album ist durchgehört – starte von vorn.");
+          } else if (idx < 0) {
+            Log.warn("Gemerkter Titel steckt nicht mehr im Album – starte von vorn.");
+          } else if (idx === album.tracks.length - 1 &&
+                     merkerVerbraucht(p, album.tracks[idx])) {
+            // Letzter Titel, letzte Sekunden: Das Album ist durchgehört (Punkt AB).
+            Log.info("Album war durchgehört – starte von vorn.");
+          } else {
             body.offset = { uri: p.trackUri };
             body.position_ms = p.positionMs || 0;
             Log.info("Setze fort bei", p.trackUri, Math.round((p.positionMs || 0) / 1000) + " s");
-          } else {
-            Log.warn("Gemerkter Titel steckt nicht mehr im Album – starte von vorn.");
           }
         }
       }
@@ -3706,6 +4062,8 @@ var Player = (function () {
 
       var dev = await ensureDevice(App.cfg);
       await sendPlay(dev, body, "off");
+      setzeAuftrag(album.tracks, ctx);
+      Stats.start(albumId);
       setPlaying(ctx, albumId, body.offset ? body.offset.uri : null);
     },
 
@@ -3725,6 +4083,8 @@ var Player = (function () {
 
       var dev = await ensureDevice(App.cfg);
       await sendPlay(dev, { context_uri: ctx, offset: { position: position } }, "off");
+      setzeAuftrag((album && album.tracks) || [], ctx);
+      Stats.start(albumId);
       setPlaying(ctx, albumId, tr && tr.uri);
     },
 
@@ -3744,6 +4104,11 @@ var Player = (function () {
       // Tag mit demselben Lied. Ein einzelner Titel bleibt davon unberührt
       // (playPlaylistTrack schaltet aus), sonst käme das getippte Lied nicht.
       await sendPlay(dev, { context_uri: ctx }, "on");
+      // Auch die Musikzeile soll enden, wenn sie durch ist. Gemischt heißt nur
+      // andere Reihenfolge – die erlaubten Titel sind dieselben.
+      var plAll = App.cache && App.cache.playlists && App.cache.playlists[se.id];
+      setzeAuftrag((plAll && plAll.tracks) || [], null);
+      Stats.start(sourceId);
       setPlaying(ctx, sourceId, null);
     },
 
@@ -3775,6 +4140,8 @@ var Player = (function () {
       // Shuffle aus: sonst spielt Spotify die uebergebene Liste durcheinander
       // und das getippte Lied kaeme nicht zuerst.
       await sendPlay(dev, { uris: uris }, "off");
+      setzeAuftrag(uris, null);
+      Stats.start(FAV_ID);
       setPlaying(null, FAV_ID, teil[0].uri);
     },
 
@@ -3794,6 +4161,8 @@ var Player = (function () {
       var dev = await ensureDevice(App.cfg);
       // Einzelner Titel: Shuffle aus, sonst kommt danach etwas Zufälliges.
       await sendPlay(dev, { context_uri: ctx, offset: { uri: trackUri } }, "off");
+      setzeAuftrag(liste, null);
+      Stats.start(sourceId);
       setPlaying(ctx, sourceId, trackUri);
     }
   };
@@ -3998,6 +4367,62 @@ var Bar = (function () {
     await Store.saveProgress(App.progress);
   }
 
+  /* Läuft noch, was die Hörbox gestartet hat?  (Punkt AB)
+     Rückgabe true = angehalten, der Rest des Takts ist dann hinfällig.
+
+     Zwei Sicherungen gegen falsche Bremsungen: Direkt nach einem Start meldet
+     Spotify noch den VORIGEN Titel – am Gerät mit 1774 ms gemessen –, deshalb
+     eine Schonfrist. Und ein einzelner Blick genügt nicht: Der fremde Titel
+     muss beim zweiten Hinsehen immer noch derselbe sein. Die Rückfrage wird
+     dafür vorgezogen, sonst dauerte es bis zum nächsten 5-s-Takt. */
+  var fremdUri = null, fremdSeit = 0;
+  var SCHONFRIST = 8000;      // so lange nach einem Start wird nicht geprüft
+  var GEDULD = 1200;          // so lange muss der fremde Titel schon laufen
+
+  async function pruefeFremd(state) {
+    var auf = App.auftrag;
+    var it = state && state.item;
+    if (!auf || !it || !it.uri || !state.is_playing) { fremdUri = null; return false; }
+
+    // linked_from steht drin, wenn Spotify den Titel für den Markt getauscht
+    // hat. Ohne diesen Abgleich hielte die Aufsicht mitten im Album an.
+    var lf = it.linked_from && it.linked_from.uri;
+    if (auf.erlaubt[it.uri] || (lf && auf.erlaubt[lf])) { fremdUri = null; return false; }
+
+    if (Date.now() - auf.ab < SCHONFRIST) return false;
+
+    if (fremdUri !== it.uri) {
+      fremdUri = it.uri;
+      fremdSeit = Date.now();
+      // Gleich nochmal nachsehen statt erst beim naechsten 5-s-Takt.
+      setTimeout(function () { once(); }, 1500);
+      return false;
+    }
+    if (Date.now() - fremdSeit < GEDULD) return false;
+
+    Log.warn("Fremder Titel in der Wiedergabe:", it.name || it.uri,
+             "– das sind Spotifys Vorschläge. Halte an.");
+    fremdUri = null;
+    App.auftrag = null;
+    try { await Api.put("/v1/me/player/pause"); }
+    catch (e) { Log.warn("Pause nicht angenommen:", (e && e.message) || e); }
+
+    // Das Album ist damit durch. Der Merker wird NICHT geworfen, sondern auf
+    // „fertig" gestellt: Gelöscht wüsste die Kachel nichts mehr und zeigte
+    // wieder einen leeren Balken – dabei ist das Album gerade vollständig
+    // gehört worden (Punkt AC). Fortgesetzt wird an so einem Merker nicht.
+    if (auf.merker && App.progress) {
+      App.progress[auf.merker] = { trackUri: null, positionMs: 0, ts: Date.now(), fertig: true };
+      await Store.saveProgress(App.progress);
+      Log.info("Merker auf durchgehört gesetzt:", auf.merker);
+      markPlayingTiles();
+    }
+
+    state.is_playing = false;
+    apply(state);
+    return true;
+  }
+
   var abfrageLaeuft = false;
 
   async function once() {
@@ -4016,6 +4441,8 @@ var Bar = (function () {
       abfrageLaeuft = false;
     }
     apply(state);
+    if (await pruefeFremd(state)) return state;
+    Stats.tick(state);
     if (state && state.item && state.is_playing) await remember(state);
     Sleep.check(state);
     return state;
@@ -4409,6 +4836,80 @@ function playingIds() {
   return out;
 }
 
+/* Wie weit ist dieses Album gehört?  (Punkt AC)
+   Rechnet aus dem Merker einen Anteil: die Längen aller Kapitel davor plus
+   die Stelle im laufenden Kapitel, geteilt durch die Gesamtlänge. Alle Werte
+   liegen im Cache – das kostet keinen einzigen Netzaufruf.
+
+   Nur Geschichten haben einen Merker (§6.3), Musik also bewusst keinen
+   Balken: Eine gemischte Playlist hat keinen Fortschritt, den man anzeigen
+   könnte, und ein Balken, der immer auf null steht, wäre eine Lüge. */
+function hoerstand(albumId) {
+  var al = albumById(albumId);
+  if (!al || !al.tracks || !al.tracks.length) return null;
+  var p = App.progress && App.progress[al.isEpisode ? al.id : "spotify:album:" + albumId];
+  if (!p) return null;
+
+  // Durchgehört: Der Merker trägt keine Stelle mehr, nur noch die Marke.
+  if (p.fertig) {
+    return { anteil: 1, idx: al.tracks.length, kapitelAnteil: 0, fertig: true };
+  }
+
+  var gesamt = 0, davor = 0, idx = al.isEpisode ? 0 : -1;
+  var i;
+  for (i = 0; i < al.tracks.length; i++) {
+    if (!al.isEpisode && al.tracks[i].uri === p.trackUri) idx = i;
+    gesamt += al.tracks[i].ms || 0;
+  }
+  // Gemerkter Titel steckt nicht mehr im Album – dann ist auch der Anteil
+  // nicht mehr zu bestimmen. Lieber gar kein Balken als ein falscher.
+  if (idx < 0 || !gesamt) return null;
+  for (i = 0; i < idx; i++) davor += al.tracks[i].ms || 0;
+
+  var stelle = p.positionMs || 0;
+  var kapMs = al.tracks[idx].ms || 0;
+  var anteil = Math.max(0, Math.min(1, (davor + stelle) / gesamt));
+  return {
+    anteil: anteil,
+    idx: idx,
+    kapitelAnteil: kapMs ? Math.max(0, Math.min(1, stelle / kapMs)) : 0,
+    fertig: anteil >= 0.995
+  };
+}
+
+/* Balken auffrischen, ohne die ganze Ansicht neu zu bauen. Läuft im selben
+   Takt wie die Kachelmarkierung, also alle fünf Sekunden – ein voller
+   renderKid() wäre dafür zu teuer und würde außerdem die Scrollstelle
+   verlieren. */
+function markHoerTiles() {
+  var body = $("kidBody");
+  if (!body || !body.querySelectorAll) return;
+  var nodes = body.querySelectorAll("[data-hoer]");
+  var bekannt = {};
+  for (var i = 0; i < nodes.length; i++) {
+    var n = nodes[i];
+    if (!n.getAttribute || !n.querySelector) continue;
+    var id = n.getAttribute("data-hoer");
+    if (!(id in bekannt)) bekannt[id] = hoerstand(id);
+    var h = bekannt[id];
+    var pos = n.getAttribute("data-hoerpos");
+    var anteil = 0;
+    if (h) {
+      if (pos === null || pos === undefined || pos === "") {
+        anteil = h.anteil;
+      } else {
+        var k = parseInt(pos, 10);
+        anteil = k < h.idx ? 1 : (k === h.idx ? h.kapitelAnteil : 0);
+      }
+    }
+    var bar = n.querySelector(".hoer");
+    if (!bar) continue;
+    var fuell = bar.firstChild;
+    if (fuell && fuell.style) fuell.style.width = (Math.round(anteil * 1000) / 10) + "%";
+    bar.className = "hoer" + (anteil <= 0 ? " is-empty" : (anteil >= 0.995 ? " is-full" : ""));
+  }
+}
+
 function markPlayingTiles() {
   var body = $("kidBody");
   if (!body || !body.querySelectorAll) return;
@@ -4419,6 +4920,7 @@ function markPlayingTiles() {
     var base = String(n.className || "").replace(/\s*is-playing/g, "");
     n.className = want[n.getAttribute("data-id")] ? base + " is-playing" : base;
   }
+  markHoerTiles();
 }
 
 /* ---------------------------------------------------------------------------
@@ -4618,6 +5120,11 @@ function level1Items() {
   return items;
 }
 
+/* Der Balken wird IMMER mitgebaut, auch wenn noch nichts gehört ist. Sonst
+   müsste `markHoerTiles` Knoten nachträglich einhängen, und die Kachel
+   sprünge beim ersten Merker um sieben Pixel. */
+function hoerHtml() { return '<div class="hoer is-empty"><i></i></div>'; }
+
 function coverHtml(url) {
   return url ? '<img src="' + esc(url) + '" alt="" loading="lazy" decoding="async">' : "";
 }
@@ -4646,7 +5153,7 @@ function tileHtml(item) {
     extra = '<div class="folder-tab">' + SVG_FOLDER +
             ((item.albumIds && item.albumIds.length) || "") + '</div>';
   } else if (item.kind === "album") {
-    action = ' data-play="album" data-id="' + esc(item.id) + '"';
+    action = ' data-play="album" data-id="' + esc(item.id) + '" data-hoer="' + esc(item.id) + '"';
     // Eine Podcast-Folge ist ein Album mit genau einem Titel. Der Listen-Knopf
     // führte dort in eine Kapitelliste mit einem einzigen Eintrag – ein Ziel,
     // das nichts erklärt und nur den Weg zurück kostet.
@@ -4657,7 +5164,9 @@ function tileHtml(item) {
   }
   return '<div class="' + cls + '"' + action + '>' +
            extra +
-           '<div class="box">' + inner + '</div>' +
+           '<div class="box">' + inner +
+             (item.kind === "album" ? hoerHtml() : "") +
+           '</div>' +
            '<span class="cap">' + esc(item.name) + '</span>' +
          '</div>';
 }
@@ -4667,11 +5176,12 @@ function tileHtml(item) {
    startet hinter einem ausgeblendeten Kapitel das falsche. */
 function chapterTileHtml(albumId, track, shownIndex, realPos) {
   return '<div class="tile chapter tap" data-play="track" data-id="' + esc(albumId) +
-         '" data-pos="' + realPos + '" data-uri="' + esc(track.uri) + '">' +
+         '" data-pos="' + realPos + '" data-uri="' + esc(track.uri) +
+         '" data-hoer="' + esc(albumId) + '" data-hoerpos="' + realPos + '">' +
            '<div class="box"><div class="num">' +
              '<span class="n">' + (shownIndex + 1) + '</span>' +
              '<span class="d">' + fmtDur(track.ms) + '</span>' +
-           '</div></div>' +
+           '</div>' + hoerHtml() + '</div>' +
          '</div>';
 }
 
@@ -4864,6 +5374,9 @@ function openFolder(id) {
 }
 
 function onKidTap(e) {
+  // Nach einem langen Druck folgt trotzdem ein Klick. Ohne diese Sperre
+  // startete die Kachel die Wiedergabe, während die Rückfrage noch offen ist.
+  if (Langdruck.gesperrt()) { Log.info("Tipp nach langem Druck verworfen."); return; }
   var node = e.target;
   while (node && node !== e.currentTarget && !(node.getAttribute &&
          (node.getAttribute("data-open") || node.getAttribute("data-play")))) {
@@ -5023,6 +5536,333 @@ function toast(text) {
   if (toastTimer) clearTimeout(toastTimer);
   toastTimer = setTimeout(function () { el.className = ""; }, 1800);
 }
+
+/* ------------------------- Statistik  (Punkt AE) -------------------------
+   Gezählt wird in Summen, nicht als Ereignisliste. Der Grund ist der Platz:
+   localStorage fasst rund 5 MB und teilt sie sich schon mit dem Cover-Cache.
+   Eine Zeile je Start wüchse unbegrenzt; drei Summen je Kachel und je ein
+   Eimer für Stunde und Tag bleiben klein und beantworten dieselben Fragen.
+
+   Gespeichert wird höchstens einmal pro Minute. Bei jedem 5-Sekunden-Takt zu
+   schreiben hieße 720 Schreibvorgänge pro Stunde auf einem alten Tablet –
+   für eine Zahl, die niemand in Echtzeit liest. */
+var Stats = (function () {
+  var TAGE_MAX = 90;
+  var SPEICHER_MS = 60000;
+  var LUECKE_MS = 12000;     // längere Pause = Funkloch, nicht Hörzeit
+
+  var st = null;
+  var letzterTick = 0;
+  var schmutzig = false;
+  var zuletztGespeichert = 0;
+
+  function leer() {
+    var stunden = [], i;
+    for (i = 0; i < 24; i++) stunden.push(0);
+    return { version: 1, seit: Date.now(), titel: {}, stunden: stunden, tage: {} };
+  }
+
+  function heilen(x) {
+    if (!x || typeof x !== "object") return leer();
+    var d = leer();
+    if (!x.titel || typeof x.titel !== "object") x.titel = d.titel;
+    if (!Array.isArray(x.stunden) || x.stunden.length !== 24) x.stunden = d.stunden;
+    if (!x.tage || typeof x.tage !== "object") x.tage = d.tage;
+    if (!x.seit) x.seit = d.seit;
+    x.version = 1;
+    return x;
+  }
+
+  function tagesschluessel(d) {
+    function zwei(n) { return (n < 10 ? "0" : "") + n; }
+    return d.getFullYear() + "-" + zwei(d.getMonth() + 1) + "-" + zwei(d.getDate());
+  }
+
+  /* Alte Tage wegräumen, sonst wächst die Ablage still weiter. */
+  function stutzen() {
+    var keys = Object.keys(st.tage);
+    if (keys.length <= TAGE_MAX) return;
+    keys.sort();
+    for (var i = 0; i < keys.length - TAGE_MAX; i++) delete st.tage[keys[i]];
+  }
+
+  function eintrag(id) {
+    if (!st.titel[id]) st.titel[id] = { name: nameFuer(id), starts: 0, ms: 0, letzte: 0 };
+    // Der Name kann sich ändern (umbenannte Quelle) – dann mitziehen, solange
+    // die Kachel noch existiert.
+    var frisch = nameFuer(id);
+    if (frisch && frisch !== id) st.titel[id].name = frisch;
+    return st.titel[id];
+  }
+
+  function nameFuer(id) {
+    if (!id) return "";
+    if (id === FAV_ID) return "Lieblingssongs";
+    var al = albumById(id);
+    if (al) return al.name || "";
+    var se = sourceEntry(id);
+    if (se) return se.name || se.playlistName || "";
+    var grp = groupById(id);
+    if (grp) return grp.name || "";
+    return String(id);
+  }
+
+  async function sichern(sofort) {
+    if (!st || !schmutzig) return;
+    if (!sofort && Date.now() - zuletztGespeichert < SPEICHER_MS) return;
+    stutzen();
+    schmutzig = false;
+    zuletztGespeichert = Date.now();
+    var ok = await Store.saveStats(st);
+    if (!ok) Log.warn("Statistik konnte nicht gespeichert werden.");
+  }
+
+  return {
+    async laden() { st = heilen(await Store.loadStats()); },
+
+    daten: function () { return st; },
+
+    /* Ein Start. Zählt als Nutzung, auch wenn danach gleich weggetippt wird –
+       genau das ist die Frage „wie oft wurde etwas angefangen". */
+    start: function (id) {
+      if (!st || !id || App.demo) return;
+      var e = eintrag(id);
+      e.starts++;
+      e.letzte = Date.now();
+      schmutzig = true;
+    },
+
+    /* Hörzeit aus dem laufenden Takt. Die Zeit seit dem vorigen Blick wird
+       dem gerade laufenden Eintrag gutgeschrieben – aber nur, wenn sie
+       plausibel ist. Hing die Abfrage im Funkloch (am Gerät mit 4846 ms
+       gemessen, Ausreißer darüber kommen vor), wäre die Lücke keine Hörzeit. */
+    tick: function (state) {
+      if (!st || App.demo) return;
+      var jetzt = Date.now();
+      var vorher = letzterTick;
+      letzterTick = jetzt;
+
+      var laeuft = !!(state && state.is_playing && state.item);
+      var id = App.playing && App.playing.id;
+      if (!laeuft || !id || !vorher) return;
+
+      var dt = jetzt - vorher;
+      if (dt <= 0 || dt > LUECKE_MS) return;
+
+      eintrag(id).ms += dt;
+      var d = new Date(jetzt);
+      st.stunden[d.getHours()] += dt;
+      var tk = tagesschluessel(d);
+      st.tage[tk] = (st.tage[tk] || 0) + dt;
+      schmutzig = true;
+      sichern(false);
+    },
+
+    async zuruecksetzen() {
+      st = leer();
+      schmutzig = false;
+      zuletztGespeichert = Date.now();
+      await Store.saveStats(st);
+      Log.info("Statistik zurückgesetzt.");
+    },
+
+    async jetztSichern() { await sichern(true); },
+    tagesschluessel: tagesschluessel
+  };
+})();
+
+/* Aus Millisekunden eine Angabe, die man vorlesen kann. `fmtDur` liefert
+   m:ss und wird ab einer Stunde unlesbar. */
+function fmtStd(ms) {
+  var min = Math.round((ms || 0) / 60000);
+  if (min < 1) return "unter 1 min";
+  if (min < 60) return min + " min";
+  var h = Math.floor(min / 60), r = min % 60;
+  return h + " h" + (r ? " " + r + " min" : "");
+}
+
+/* ------------------- Hörstand zurücksetzen  (Punkt AD) -------------------
+   Der Merker liegt unter `spotify:album:<id>`, bei Podcast-Folgen unter der
+   Kachel-ID (§6.3). Beide Formen müssen hier bedient werden, sonst bliebe
+   ausgerechnet die Folge stehen, die am längsten läuft. */
+function merkerSchluessel(albumId) {
+  var al = albumById(albumId);
+  return (al && al.isEpisode) ? al.id : "spotify:album:" + albumId;
+}
+
+function merkerAnzahl() {
+  return App.progress ? Object.keys(App.progress).length : 0;
+}
+
+async function hoerstandLoeschen(ids, was) {
+  if (!App.progress) App.progress = {};
+  var n = 0;
+  for (var i = 0; i < (ids || []).length; i++) {
+    var k = merkerSchluessel(ids[i]);
+    if (App.progress[k]) { delete App.progress[k]; n++; }
+  }
+  if (n) {
+    var ok = await Store.saveProgress(App.progress);
+    if (!ok) Log.error("Hörstand konnte nicht gespeichert werden.");
+  }
+  Log.info("Hörstand zurückgesetzt:", was, "→", n, (n === 1 ? "Eintrag" : "Einträge"));
+  markPlayingTiles();
+  return n;
+}
+
+async function hoerstandAllesLoeschen() {
+  var n = merkerAnzahl();
+  App.progress = {};
+  var ok = await Store.saveProgress(App.progress);
+  if (!ok) Log.error("Hörstand konnte nicht gespeichert werden.");
+  Log.info("Alle Hörpositionen zurückgesetzt:", n, (n === 1 ? "Eintrag" : "Einträge"));
+  markPlayingTiles();
+  return n;
+}
+
+/* Welche Alben stecken hinter der gedrückten Kachel? Ein Ordner steht für
+   alle seine Alben, eine Kapitel-Kachel für ihr Album – ein einzelnes Kapitel
+   hat keinen eigenen Merker, das wäre eine Bedienung ohne Wirkung. */
+function albenHinter(knoten) {
+  var id = knoten.getAttribute("data-id");
+  var hoer = knoten.getAttribute("data-hoer");
+  if (knoten.getAttribute("data-open") === "folder") {
+    var grp = groupById(id);
+    if (grp) return { ids: visibleAlbums(grp.albumIds), name: grp.name || "Ordner", ordner: true };
+    var se = sourceEntry(id);
+    if (se) return { ids: visibleAlbums(se.albumIds),
+                     name: se.name || se.playlistName || "Ordner", ordner: true };
+    return null;
+  }
+  if (hoer) {
+    var al = albumById(hoer);
+    return al ? { ids: [hoer], name: al.name || "", ordner: false } : null;
+  }
+  return null;
+}
+
+/* Rückfrage-Overlay. Hält die zugesagte Handlung fest, statt sie über einen
+   Knopf-Zuhörer neu zu binden – sonst stapelten sich die Zuhörer. */
+var Ask = (function () {
+  var handlung = null;
+
+  function zu() {
+    var ov = $("askOverlay");
+    if (ov) ov.className = "";
+    handlung = null;
+  }
+
+  return {
+    open: function (frage, unterzeile, fn) {
+      var ov = $("askOverlay");
+      if (!ov) return;
+      handlung = fn;
+      var m = $("askMsg"); if (m) m.textContent = frage;
+      var u = $("askSub"); if (u) u.textContent = unterzeile || "";
+      ov.className = "is-on";
+    },
+    ja: function () { var f = handlung; zu(); if (f) f(); },
+    nein: zu,
+    offen: function () { var ov = $("askOverlay"); return !!(ov && ov.className === "is-on"); }
+  };
+})();
+
+/* Langer Druck auf eine Kachel öffnet die Rückfrage.
+
+   700 ms und 14 px Toleranz: Der Admin-Zugang (Punkt J) bricht bei JEDER
+   Fingerbewegung ab und ist am Tablet deshalb praktisch nicht auszulösen.
+   Ein Kinderfinger wackelt immer – also ein Schwellwert statt eines
+   Abbruchs. 14 px sind klein genug, dass Wischen zum Scrollen weiterhin
+   abbricht und nicht versehentlich die Rückfrage öffnet. */
+var Langdruck = (function () {
+  var HALTE_MS = 700;
+  var WACKEL_PX = 14;
+  var timer = null, x0 = 0, y0 = 0;
+  var sperreBis = 0;              // unterdrückt den Klick nach dem Halten
+
+  function ziel(node) {
+    while (node && node.getAttribute) {
+      if (node.getAttribute("data-hoer") ||
+          node.getAttribute("data-open") === "folder") return node;
+      node = node.parentNode;
+    }
+    return null;
+  }
+
+  function ab() { if (timer) { clearTimeout(timer); timer = null; } }
+
+  function an(e, x, y) {
+    ab();
+    if (App.demo) return;
+    if (App.screen !== "screenKid") return;
+    if (Ask.offen()) return;
+    var k = ziel(e.target);
+    if (!k) return;
+    var treffer = albenHinter(k);
+    if (!treffer || !treffer.ids.length) return;
+    x0 = x; y0 = y;
+    timer = setTimeout(function () {
+      timer = null;
+      sperreBis = Date.now() + 1200;
+      var gemerkt = 0;
+      for (var i = 0; i < treffer.ids.length; i++) {
+        if (App.progress && App.progress[merkerSchluessel(treffer.ids[i])]) gemerkt++;
+      }
+      if (!gemerkt) {
+        toast(treffer.ordner ? "Hier ist noch nichts gemerkt" : "Das läuft ohnehin von vorn");
+        return;
+      }
+      Log.info("Langer Druck auf", treffer.name, "→ Rückfrage.");
+      Ask.open(
+        treffer.ordner ? (treffer.name + ": alles von vorn?") : ((treffer.name || "Das") + " von vorn?"),
+        treffer.ordner
+          ? (gemerkt + " von " + treffer.ids.length + " Geschichten sind angefangen.")
+          : "Die gemerkte Stelle wird vergessen.",
+        function () {
+          hoerstandLoeschen(treffer.ids, treffer.name).then(function (n) {
+            toast(n === 1 ? "Fängt wieder von vorn an" : n + " zurückgesetzt");
+          });
+        }
+      );
+    }, HALTE_MS);
+  }
+
+  function bewegt(x, y) {
+    if (!timer) return;
+    if (Math.abs(x - x0) > WACKEL_PX || Math.abs(y - y0) > WACKEL_PX) ab();
+  }
+
+  return {
+    gesperrt: function () { return Date.now() < sperreBis; },
+    verdrahten: function () {
+      var body = $("kidBody");
+      if (!body || !body.addEventListener) return;
+      if (window.PointerEvent) {
+        body.addEventListener("pointerdown", function (e) { an(e, e.clientX, e.clientY); });
+        body.addEventListener("pointermove", function (e) { bewegt(e.clientX, e.clientY); });
+        body.addEventListener("pointerup", ab);
+        body.addEventListener("pointercancel", ab);
+      } else {
+        body.addEventListener("touchstart", function (e) {
+          var t = e.touches && e.touches[0];
+          if (t) an(e, t.clientX, t.clientY);
+        });
+        body.addEventListener("touchmove", function (e) {
+          var t = e.touches && e.touches[0];
+          if (t) bewegt(t.clientX, t.clientY);
+        });
+        body.addEventListener("touchend", ab);
+        body.addEventListener("touchcancel", ab);
+        // Damit sich der lange Druck auch am Rechner prüfen lässt.
+        body.addEventListener("mousedown", function (e) { an(e, e.clientX, e.clientY); });
+        body.addEventListener("mouseup", ab);
+      }
+      // Scrollen bricht ab: Sonst öffnete jede Wischbewegung, die auf einer
+      // Kachel beginnt und den Finger kaum bewegt, die Rückfrage.
+      window.addEventListener("scroll", ab);
+    }
+  };
+})();
 
 /* --------------------- Admin-Zugang: langer Druck ----------------------- */
 /* Spec §7: unsichtbares Feld 44 × 44 px links oben, drei Sekunden halten.
@@ -5399,6 +6239,47 @@ function wire() {
   $("btnBackupImport").addEventListener("click", function () { importBackup(); });
 
   $("kidBody").addEventListener("click", onKidTap);
+  Langdruck.verdrahten();
+  $("btnStats").addEventListener("click", function () { openStats(); });
+  $("btnStatsClose").addEventListener("click", function () { show("screenAdmin"); });
+  (function () {
+    var scharf = false;
+    $("btnStatsReset").addEventListener("click", async function () {
+      if (!scharf) {
+        scharf = true;
+        this.textContent = "Wirklich? Zählung verwerfen";
+        setStatus("statsStatus", "Nochmal drücken, um zu bestätigen.", "err");
+        return;
+      }
+      scharf = false;
+      this.textContent = "Statistik zurücksetzen";
+      await Stats.zuruecksetzen();
+      renderStats();
+      setStatus("statsStatus", "Zählung zurückgesetzt.", "ok");
+    });
+  })();
+  $("btnAskYes").addEventListener("click", function () { Ask.ja(); });
+  $("btnAskNo").addEventListener("click", function () { Ask.nein(); });
+
+  /* Zentrales Zurücksetzen. Zweistufig wie das Entfernen einer Quelle: Der
+     Knopf fragt erst „Wirklich?", bevor er alles vergisst. */
+  (function () {
+    var scharf = false;
+    $("btnProgReset").addEventListener("click", async function () {
+      if (!scharf) {
+        if (!merkerAnzahl()) { setStatus("progStatus", "Es ist nichts gemerkt.", "ok"); return; }
+        scharf = true;
+        this.textContent = "Wirklich? Alles vergessen";
+        setStatus("progStatus", "Nochmal drücken, um zu bestätigen.", "err");
+        return;
+      }
+      scharf = false;
+      this.textContent = "Alle Hörpositionen zurücksetzen";
+      var n = await hoerstandAllesLoeschen();
+      renderProgInfo();
+      setStatus("progStatus", n + (n === 1 ? " Hörposition" : " Hörpositionen") + " zurückgesetzt.", "ok");
+    });
+  })();
 
   $("pPlay").addEventListener("click", function () { guard(function () { return Bar.toggle(); }); });
   $("pNext").addEventListener("click", function () { guard(function () { return Bar.next(); }); });
@@ -5552,7 +6433,7 @@ async function copyLog(statusId) {
    Zahl an, die nichts mehr bedeutet – und genau dafür ist sie da: erkennen,
    ob nach einem Push schon der neue Stand geladen ist. Ablesen mit
    `git rev-list --count HEAD` (+1 für den Commit, der gerade entsteht). */
-var APP_VERSION = "v31";
+var APP_VERSION = "v33";
 
 async function boot() {
   var vb = $("verBadge");
@@ -5571,6 +6452,7 @@ async function boot() {
   App.cfg = await Store.loadConfig();
   App.cache = await Store.loadCache();
   App.progress = await Store.loadProgress();
+  await Stats.laden();
   if (App.cache) {
     Log.info("Cache geladen:", Object.keys(App.cache.albums || {}).length, "Alben, Stand",
              new Date(App.cache.syncedAt || 0).toLocaleString("de-DE"));
