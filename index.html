@@ -3848,14 +3848,26 @@ var Player = (function () {
      und die Web-API kennt keinen Schalter dafür. Also merkt sich die Hörbox,
      was sie selbst gestartet hat. Taucht in der Abfrage etwas anderes auf,
      ist die Vorlage zu Ende und die Vorschläge haben übernommen: Bar hält an. */
-  function setzeAuftrag(tracks, merker) {
-    var erlaubt = {}, n = 0;
+  function setzeAuftrag(tracks, merker, mitReihenfolge) {
+    var erlaubt = {}, n = 0, letzte = null;
     for (var i = 0; i < (tracks || []).length; i++) {
       var u = typeof tracks[i] === "string" ? tracks[i] : (tracks[i] && tracks[i].uri);
-      if (u && !erlaubt[u]) { erlaubt[u] = true; n++; }
+      if (!u) continue;
+      if (!erlaubt[u]) { erlaubt[u] = true; n++; }
+      letzte = u;
     }
     // Ohne Titelliste lieber gar keine Aufsicht als eine, die falsch anhält.
-    App.auftrag = n ? { erlaubt: erlaubt, merker: merker || null, ab: Date.now() } : null;
+    if (!n) { App.auftrag = null; return; }
+    App.auftrag = {
+      erlaubt: erlaubt,
+      // Der letzte Titel – das ist die eigentliche Sperre (Punkt AF). Er steht
+      // seit dem Einlesen im Cache, es braucht dafür keinen neuen Abruf. Nur
+      // wo die Reihenfolge feststeht: Eine gemischte Musikzeile hat keinen
+      // vorhersagbaren letzten Titel, dort bleibt es bei der Nachsorge.
+      letzte: mitReihenfolge ? letzte : null,
+      merker: merker || null,
+      ab: Date.now()
+    };
   }
 
   /* Steht der Merker in den letzten Sekunden des letzten Titels, ist er
@@ -3981,7 +3993,7 @@ var Player = (function () {
 
       var dev = await ensureDevice(App.cfg);
       await sendPlay(dev, body, "off");
-      setzeAuftrag([folge.uri], album.id);
+      setzeAuftrag([folge.uri], album.id, true);
       Stats.start(album.id);
       // Ohne Kontext gibt es nichts, woran die Oberflaeche die Kachel erkennt –
       // deshalb die Kachel-ID selbst festhalten.
@@ -3997,7 +4009,13 @@ var Player = (function () {
 
       // Läuft genau dieses Album schon? Dann nicht neu starten (Entscheidung F5).
       var state = await nowPlaying(3000);
-      if (!fromStart && state && state.context && state.context.uri === ctx) {
+      // ACHTUNG: Der Kontext allein beweist nichts. Spotifys automatische
+      // Wiedergabe behält nach dem letzten Titel den Albumkontext BEI und
+      // hängt trotzdem fremde Vorschläge an – am Gerät am 27.08.2026 belegt.
+      // Ohne die Titelprüfung hielt die App das für „läuft ja schon", tat
+      // nichts, und die Vorschläge liefen unbeirrt weiter.
+      var eigen = !!(state && state.item && istImAlbum(album, state.item.uri));
+      if (!fromStart && state && state.context && state.context.uri === ctx && eigen) {
         if (state.is_playing) {
           Log.info("Album läuft bereits – kein Neustart.");
           setPlaying(ctx, albumId, state.item && state.item.uri);
@@ -4018,6 +4036,12 @@ var Player = (function () {
         }
         Log.info("Album steht am Ende – starte von vorn.");
         fromStart = true;
+      } else if (!fromStart && state && state.context && state.context.uri === ctx && !eigen) {
+        // Vorschläge laufen unter unserem Kontext. Hier NICHT `fromStart`
+        // erzwingen: Steht ein echter Merker mitten im Album, soll der Tipp
+        // dort fortsetzen und nicht vierzig Minuten verwerfen. Der weitere
+        // Weg unten entscheidet das anhand des Merkers.
+        Log.info("Fremder Titel unter dem Albumkontext – starte das Album neu.");
       }
 
       var body = { context_uri: ctx };
@@ -4062,7 +4086,7 @@ var Player = (function () {
 
       var dev = await ensureDevice(App.cfg);
       await sendPlay(dev, body, "off");
-      setzeAuftrag(album.tracks, ctx);
+      setzeAuftrag(album.tracks, ctx, true);
       Stats.start(albumId);
       setPlaying(ctx, albumId, body.offset ? body.offset.uri : null);
     },
@@ -4083,7 +4107,7 @@ var Player = (function () {
 
       var dev = await ensureDevice(App.cfg);
       await sendPlay(dev, { context_uri: ctx, offset: { position: position } }, "off");
-      setzeAuftrag((album && album.tracks) || [], ctx);
+      setzeAuftrag((album && album.tracks) || [], ctx, true);
       Stats.start(albumId);
       setPlaying(ctx, albumId, tr && tr.uri);
     },
@@ -4140,7 +4164,7 @@ var Player = (function () {
       // Shuffle aus: sonst spielt Spotify die uebergebene Liste durcheinander
       // und das getippte Lied kaeme nicht zuerst.
       await sendPlay(dev, { uris: uris }, "off");
-      setzeAuftrag(uris, null);
+      setzeAuftrag(uris, null, true);
       Stats.start(FAV_ID);
       setPlaying(null, FAV_ID, teil[0].uri);
     },
@@ -4161,7 +4185,7 @@ var Player = (function () {
       var dev = await ensureDevice(App.cfg);
       // Einzelner Titel: Shuffle aus, sonst kommt danach etwas Zufälliges.
       await sendPlay(dev, { context_uri: ctx, offset: { uri: trackUri } }, "off");
-      setzeAuftrag(liste, null);
+      setzeAuftrag(liste, null, true);
       Stats.start(sourceId);
       setPlaying(ctx, sourceId, trackUri);
     }
@@ -4354,7 +4378,16 @@ var Bar = (function () {
     } else {
       var ctx = state.context && state.context.uri;
       if (!ctx || ctx.indexOf("spotify:album:") !== 0) return;
-      if (!albumById(ctx.slice(14))) return;
+      var alb = albumById(ctx.slice(14));
+      if (!alb) return;
+      // Der Kontext bleibt bei Spotifys Vorschlägen auf dem Album stehen. Ohne
+      // diese Prüfung schriebe die App einen Vorschlagstitel als Hörstelle des
+      // Hörspiels – und der Balken auf der Kachel zeigte Unsinn (Punkt AF).
+      var lf0 = it && it.linked_from && it.linked_from.uri;
+      if (!istImAlbum(alb, trackUri, lf0)) {
+        Log.info("Fremder Titel im Albumkontext – Hörstelle NICHT überschrieben.");
+        return;
+      }
       schluessel = ctx;
     }
 
@@ -4375,6 +4408,17 @@ var Bar = (function () {
      eine Schonfrist. Und ein einzelner Blick genügt nicht: Der fremde Titel
      muss beim zweiten Hinsehen immer noch derselbe sein. Die Rückfrage wird
      dafür vorgezogen, sonst dauerte es bis zum nächsten 5-s-Takt. */
+  /* Das Album ist durch. Der Merker wird nicht geworfen, sondern markiert:
+     Gelöscht wüsste die Kachel nichts mehr, dabei ist gerade alles gehört
+     worden (Punkt AC). Fortgesetzt wird an so einem Merker nicht. */
+  async function merkerFertig(schluessel) {
+    if (!schluessel || !App.progress) return;
+    App.progress[schluessel] = { trackUri: null, positionMs: 0, ts: Date.now(), fertig: true };
+    await Store.saveProgress(App.progress);
+    Log.info("Merker auf durchgehört gesetzt:", schluessel);
+    markPlayingTiles();
+  }
+
   var fremdUri = null, fremdSeit = 0;
   var SCHONFRIST = 8000;      // so lange nach einem Start wird nicht geprüft
   var GEDULD = 1200;          // so lange muss der fremde Titel schon laufen
@@ -4403,24 +4447,88 @@ var Bar = (function () {
     Log.warn("Fremder Titel in der Wiedergabe:", it.name || it.uri,
              "– das sind Spotifys Vorschläge. Halte an.");
     fremdUri = null;
-    App.auftrag = null;
+    // Der Auftrag bleibt stehen. Vorher wurde er hier gelöscht – damit war die
+    // Aufsicht nach dem ersten Eingriff blind, und ein zweiter Druck auf
+    // „weiter" ließ die Vorschläge ungehindert laufen (gemeldet 27.08.2026).
+    // Er endet erst, wenn die Hörbox selbst etwas Neues startet.
     try { await Api.put("/v1/me/player/pause"); }
     catch (e) { Log.warn("Pause nicht angenommen:", (e && e.message) || e); }
-
-    // Das Album ist damit durch. Der Merker wird NICHT geworfen, sondern auf
-    // „fertig" gestellt: Gelöscht wüsste die Kachel nichts mehr und zeigte
-    // wieder einen leeren Balken – dabei ist das Album gerade vollständig
-    // gehört worden (Punkt AC). Fortgesetzt wird an so einem Merker nicht.
-    if (auf.merker && App.progress) {
-      App.progress[auf.merker] = { trackUri: null, positionMs: 0, ts: Date.now(), fertig: true };
-      await Store.saveProgress(App.progress);
-      Log.info("Merker auf durchgehört gesetzt:", auf.merker);
-      markPlayingTiles();
-    }
+    await merkerFertig(auf.merker);
 
     state.is_playing = false;
     apply(state);
     return true;
+  }
+
+  /* Die eigentliche Sperre  (Punkt AF)
+
+     Die Nachsorge oben greift erst, wenn die Vorschläge schon laufen – das
+     sind rund zwei Sekunden fremder Ton. Besser ist, das Ende vorher zu
+     kennen: Der letzte Titel steht seit dem Einlesen im Cache. Läuft er, wird
+     seine Restzeit ausgerechnet und ein Wecker auf genau diesen Zeitpunkt
+     gestellt. Beim nächsten Takt wird der Wecker neu gestellt, damit Springen
+     und Pausieren ihn nicht falsch stehen lassen.
+
+     Beim Wecken wird der Stand FRISCH geholt statt dem bis zu fünf Sekunden
+     alten zu glauben – sonst hielte ein Wecker, den ein Rücksprung überholt
+     hat, mitten im Album an. */
+  var endeTimer = null, endeFuer = null;
+
+  function endeAbsagen() {
+    if (endeTimer) { clearTimeout(endeTimer); endeTimer = null; }
+    endeFuer = null;
+  }
+
+  function planeEnde(state) {
+    var auf = App.auftrag;
+    var it = state && state.item;
+    if (!auf || !auf.letzte || !it || !it.uri || !state.is_playing ||
+        it.uri !== auf.letzte) {
+      if (endeTimer) endeAbsagen();
+      return;
+    }
+    var rest = (it.duration_ms || 0) - (state.progress_ms || 0);
+    if (!isFinite(rest) || rest < 0) rest = 0;
+    if (endeTimer) { clearTimeout(endeTimer); endeTimer = null; }
+    if (endeFuer !== it.uri) {
+      Log.info("Letzter Titel läuft – Ende in " + Math.round(rest / 1000) + " s eingeplant.");
+      endeFuer = it.uri;
+    }
+    // 250 ms Zugabe: lieber eine Winzigkeit zu spät als das letzte Wort
+    // abschneiden.
+    endeTimer = setTimeout(function () { endeErzwingen(); }, rest + 250);
+  }
+
+  async function endeErzwingen() {
+    endeTimer = null;
+    endeFuer = null;
+    var auf = App.auftrag;
+    if (!auf || !auf.letzte) return;
+    var st = null;
+    try { st = await Api.get(PLAYER_PFAD); }
+    catch (e) { Log.warn("Stand am Albumende nicht lesbar:", (e && e.message) || "?"); return; }
+    if (!st || !st.item) { apply(st); return; }
+    if (!st.is_playing) { apply(st); return; }
+
+    var it = st.item;
+    var lf = it.linked_from && it.linked_from.uri;
+    var fremd = !auf.erlaubt[it.uri] && !(lf && auf.erlaubt[lf]);
+    var amEnde = it.uri === auf.letzte &&
+                 (st.progress_ms || 0) >= (it.duration_ms || 0) - 1500;
+    if (!fremd && !amEnde) {
+      // Fehlalarm: Es wurde zurückgesprungen oder anders weitergehört.
+      Log.info("Wecker fürs Albumende war überholt – nichts getan.");
+      apply(st);
+      planeEnde(st);
+      return;
+    }
+
+    Log.info("Albumende erreicht – halte an.");
+    try { await Api.put("/v1/me/player/pause"); }
+    catch (e2) { Log.warn("Pause am Albumende nicht angenommen:", (e2 && e2.message) || e2); }
+    await merkerFertig(auf.merker);
+    st.is_playing = false;
+    apply(st);
   }
 
   var abfrageLaeuft = false;
@@ -4442,6 +4550,7 @@ var Bar = (function () {
     }
     apply(state);
     if (await pruefeFremd(state)) return state;
+    planeEnde(state);
     Stats.tick(state);
     if (state && state.item && state.is_playing) await remember(state);
     Sleep.check(state);
@@ -4598,6 +4707,17 @@ var Bar = (function () {
   async function nextTrack() {
     var dis = last && last.actions && last.actions.disallows;
     if (dis && dis.skipping_next) { Log.info("Letzter Titel - nichts zu tun."); return; }
+
+    /* Hinter dem letzten Titel liegt nichts mehr, was zur Geschichte gehört –
+       ein „weiter" dort landet direkt in Spotifys Vorschlägen. Also gar nicht
+       erst hinschicken (Punkt AF). Vorher fing die Nachsorge das zwar ab, aber
+       erst nach zwei Sekunden fremdem Ton, und der Knopf fühlte sich kaputt an. */
+    var auf = App.auftrag;
+    if (auf && auf.letzte && last && last.item && last.item.uri === auf.letzte) {
+      Log.info("Letzter Titel - weiter fuehrt nur in die Vorschlaege, also nicht.");
+      toast("Das war das Ende");
+      return;
+    }
     var before = last && last.item && last.item.uri;
     var ziel = nachbar(1);
     if (ziel) zeigeVorab(ziel.bild, ziel.name, ziel.ms);
@@ -4955,6 +5075,19 @@ function albumById(id) { return (App.cache && App.cache.albums && App.cache.albu
    Kachel erkennen könnte – also über die URI zurücksuchen. Die Kachelzahl ist
    klein, das ist billiger als eine zweite Ablage, die konsistent gehalten
    werden müsste. */
+/* Gehört diese URI zu diesem Album? `linked_from` steht drin, wenn Spotify
+   den Titel für den Markt getauscht hat – ohne das gälte ein völlig normaler
+   Titel als fremd. Liegt bewusst außerhalb von Player und Bar: Beide brauchen
+   es, und eine zweite Fassung liefe irgendwann auseinander. */
+function istImAlbum(album, uri, linkedFrom) {
+  if (!album || !album.tracks || !uri) return false;
+  for (var i = 0; i < album.tracks.length; i++) {
+    if (album.tracks[i].uri === uri) return true;
+    if (linkedFrom && album.tracks[i].uri === linkedFrom) return true;
+  }
+  return false;
+}
+
 function tileForEpisode(uri) {
   if (!uri || !App.cache || !App.cache.albums) return null;
   var ids = Object.keys(App.cache.albums);
@@ -5775,7 +5908,11 @@ var Ask = (function () {
    Abbruchs. 14 px sind klein genug, dass Wischen zum Scrollen weiterhin
    abbricht und nicht versehentlich die Rückfrage öffnet. */
 var Langdruck = (function () {
-  var HALTE_MS = 700;
+  // 3 s, nicht 0,7 s: Am Gerät ging die Rückfrage zu leicht versehentlich auf
+  // (Rückmeldung 27.08.2026). Zurücksetzen darf keine Fingerbewegung sein, die
+  // beim Stöbern nebenbei passiert. Die 14 px Toleranz bleiben – ohne sie wäre
+  // die Geste am Tablet gar nicht auszulösen (Lehre aus Punkt J).
+  var HALTE_MS = 3000;
   var WACKEL_PX = 14;
   var timer = null, x0 = 0, y0 = 0;
   var sperreBis = 0;              // unterdrückt den Klick nach dem Halten
@@ -6433,7 +6570,7 @@ async function copyLog(statusId) {
    Zahl an, die nichts mehr bedeutet – und genau dafür ist sie da: erkennen,
    ob nach einem Push schon der neue Stand geladen ist. Ablesen mit
    `git rev-list --count HEAD` (+1 für den Commit, der gerade entsteht). */
-var APP_VERSION = "v33";
+var APP_VERSION = "v34";
 
 async function boot() {
   var vb = $("verBadge");
