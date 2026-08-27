@@ -797,11 +797,6 @@ body.has-player #screenKid { padding-bottom: 150px; }
   margin: 0 auto;
   padding: 8px 20px 28px 20px;
   text-align: center;
-  /* Waagerechte Gesten gehören uns, senkrechtes Scrollen bleibt beim Browser.
-     Damit braucht es kein preventDefault – das wäre in der alten WebView der
-     unzuverlässigere Weg (Punkt AI). */
-  -ms-touch-action: pan-y;
-  touch-action: pan-y;
 }
 /* Schließen oben links, weil dort auch in der Kinderansicht der Zurück-Pfeil
    sitzt. Ein Kind lernt eine Stelle, nicht zwei. */
@@ -827,14 +822,6 @@ body.has-player #screenKid { padding-bottom: 150px; }
 }
 /* Quadratisch über padding-top statt aspect-ratio – dasselbe wie bei der
    Kachel, aspect-ratio ist für Chrome 106 zu neu. */
-/* Das Bild folgt dem Finger. Die Verschiebung liegt auf dem RAHMEN, nicht auf
-   dem <img>: Ein bewegtes Bild behält in der Android-WebView seine alte
-   Textur, wenn mitten in der Bewegung die Quelle wechselt – genau der Fehler,
-   der schon die Drehung in der Leiste auf den Kreis statt aufs Bild zwang. */
-#bigPlayer .bp-art.zurueck {
-  -webkit-transition: -webkit-transform 160ms ease-out;
-  transition: transform 160ms ease-out;
-}
 #bigPlayer .bp-art .sq { width: 100%; padding-top: 100%; position: relative; }
 #bigPlayer .bp-art img {
   position: absolute;
@@ -1501,7 +1488,7 @@ body.has-player #screenKid { padding-bottom: 150px; }
         <path d="M6 9l6 6 6-6"/>
       </svg>
     </button>
-    <div class="bp-art" id="bpArt"><div class="sq"><img id="bpImg" alt=""></div></div>
+    <div class="bp-art"><div class="sq"><img id="bpImg" alt=""></div></div>
     <div class="bp-title" id="bpTitle"></div>
     <div class="bp-sub" id="bpSub"></div>
     <div class="bp-prog">
@@ -5901,132 +5888,6 @@ function toast(text) {
 var BigPlayer = (function () {
   function el() { return $("bigPlayer"); }
 
-  /* Wischen für den Titelwechsel  (Punkt AI)
-
-     Nach links = weiter, nach rechts = zurück; die übliche Richtung, in die
-     sich der Stapel bewegt. Ausgelöst wird über dieselben Wege wie die
-     Knöpfe (`Bar.next`/`Bar.prev`), also gelten auch dieselben Regeln: die
-     Sprungsperre, die Vorhersage des nächsten Titels und die Sperre hinter
-     dem letzten Titel einer Geschichte.
-
-     Drei Schwellen, damit die Geste nicht mit dem Scrollen kollidiert:
-     erst ab 12 px wird entschieden, wohin sie gehört; sie muss waagerechter
-     als senkrecht sein; und erst ab 60 px schaltet sie wirklich um. Wer nur
-     kurz zuckt, hat nichts getan. */
-  var AUSLOESER_PX = 60;
-  var ENTSCHEIDUNG_PX = 12;
-  var MITZIEHEN_MAX = 110;
-
-  var zieht = false, richtungFest = false, waagerecht = false;
-  var x0 = 0, y0 = 0;
-  var wischSperreBis = 0;
-
-  function bild() { return $("bpArt"); }
-
-  function schiebe(px) {
-    var b = bild();
-    if (!b || !b.style) return;
-    var v = px ? "translateX(" + Math.round(px) + "px)" : "";
-    b.style.webkitTransform = v;
-    b.style.transform = v;
-  }
-
-  function wischeAb() {
-    zieht = false; richtungFest = false; waagerecht = false;
-    var b = bild();
-    if (b) b.className = "bp-art";
-    schiebe(0);
-  }
-
-  function anfang(e, x, y) {
-    if (!el() || String(el().className).indexOf("is-on") < 0) return;
-    // Auf den Knöpfen und der Fortschrittszeile wird nicht gewischt – dort
-    // wäre ein Fehlgriff ein Titelsprung statt eines Tipps.
-    var n = e.target;
-    while (n && n !== el()) {
-      var k = String((n && n.className) || "");
-      if (k.indexOf("p-btn") >= 0 || k.indexOf("bp-prog") >= 0 ||
-          k.indexOf("bp-close") >= 0) return;
-      n = n.parentNode;
-    }
-    zieht = true; richtungFest = false; waagerecht = false;
-    x0 = x; y0 = y;
-    var b = bild();
-    if (b) b.className = "bp-art";       // beim Ziehen keine Nachlaufzeit
-  }
-
-  function bewegt(x, y) {
-    if (!zieht) return;
-    var dx = x - x0, dy = y - y0;
-    if (!richtungFest) {
-      if (Math.abs(dx) < ENTSCHEIDUNG_PX && Math.abs(dy) < ENTSCHEIDUNG_PX) return;
-      richtungFest = true;
-      waagerecht = Math.abs(dx) > Math.abs(dy);
-      if (!waagerecht) { zieht = false; return; }   // das war Scrollen
-    }
-    if (!waagerecht) return;
-    // Gedämpft und begrenzt: Das Bild soll dem Finger folgen, aber nicht frei
-    // herumfahren – es ist eine Geste, kein Schieberegler.
-    var v = dx * 0.5;
-    if (v > MITZIEHEN_MAX) v = MITZIEHEN_MAX;
-    if (v < -MITZIEHEN_MAX) v = -MITZIEHEN_MAX;
-    schiebe(v);
-  }
-
-  function ende(x) {
-    if (!zieht) { wischeAb(); return; }
-    var dx = x - x0;
-    var los = waagerecht && Math.abs(dx) >= AUSLOESER_PX;
-    zieht = false; richtungFest = false;
-
-    var b = bild();
-    if (b) b.className = "bp-art zurueck";
-    schiebe(0);
-
-    if (!los) return;
-    wischSperreBis = Date.now() + 600;
-    if (dx < 0) {
-      Log.info("Gewischt: weiter.");
-      guard(function () { return Bar.next(); });
-    } else {
-      Log.info("Gewischt: zurueck.");
-      guard(function () { return Bar.prev(); });
-    }
-  }
-
-  function verdrahten() {
-    var o = el();
-    if (!o || !o.addEventListener) return;
-    if (window.PointerEvent) {
-      o.addEventListener("pointerdown", function (e) { anfang(e, e.clientX, e.clientY); });
-      o.addEventListener("pointermove", function (e) { bewegt(e.clientX, e.clientY); });
-      o.addEventListener("pointerup", function (e) { ende(e.clientX); });
-      o.addEventListener("pointercancel", wischeAb);
-    } else {
-      o.addEventListener("touchstart", function (e) {
-        var t = e.touches && e.touches[0];
-        if (t) anfang(e, t.clientX, t.clientY);
-      });
-      o.addEventListener("touchmove", function (e) {
-        var t = e.touches && e.touches[0];
-        if (t) bewegt(t.clientX, t.clientY);
-      });
-      o.addEventListener("touchend", function (e) {
-        var t = (e.changedTouches && e.changedTouches[0]) || null;
-        ende(t ? t.clientX : x0);
-      });
-      o.addEventListener("touchcancel", wischeAb);
-      // Damit sich die Geste auch am Rechner prüfen lässt.
-      o.addEventListener("mousedown", function (e) { anfang(e, e.clientX, e.clientY); });
-      o.addEventListener("mousemove", function (e) { bewegt(e.clientX, e.clientY); });
-      o.addEventListener("mouseup", function (e) { ende(e.clientX); });
-    }
-  }
-
-  /* Der Rueckgabeblock steht ganz am Ende: Steht er weiter oben, werden die
-     var-Zuweisungen darunter nie ausgefuehrt - die Schwellwerte blieben dann
-     undefined, und jeder Wisch verlief im Sande. Funktionsdeklarationen
-     werden hochgezogen, Zuweisungen nicht. */
   return {
     offen: function () { var o = el(); return !!(o && String(o.className).indexOf("is-on") >= 0); },
 
@@ -6047,11 +5908,7 @@ var BigPlayer = (function () {
       var o = el();
       if (!o || !this.offen()) return;
       o.className = "";
-      wischeAb();
-    },
-
-    verdrahten: verdrahten,
-    hatGewischt: function () { return Date.now() < wischSperreBis; }
+    }
   };
 })();
 
@@ -6805,14 +6662,10 @@ function wire() {
 
   /* Tipp auf das runde Cover öffnet den großen Player (Punkt AH). */
   $("pCover").addEventListener("click", function () { BigPlayer.auf(); });
-  BigPlayer.verdrahten();
   $("bpClose").addEventListener("click", function () { schliesseBigPlayer(); });
   // Tipp neben die Karte schließt ebenfalls. Bewusst nur der Hintergrund
   // selbst: Ein Tipp auf Bild, Titel oder Knopf darf nichts zumachen.
   $("bigPlayer").addEventListener("click", function (e) {
-    // Nach einem Wisch folgt ein Klick. Ohne diese Abfrage schlösse eine
-    // Geste, die neben der Karte beginnt, gleich noch den Player (Punkt AI).
-    if (BigPlayer.hatGewischt()) return;
     if (e && e.target === this) schliesseBigPlayer();
   });
   $("bpPlay").addEventListener("click", function () { guard(function () { return Bar.toggle(); }); });
@@ -6981,7 +6834,7 @@ async function copyLog(statusId) {
    Zahl an, die nichts mehr bedeutet – und genau dafür ist sie da: erkennen,
    ob nach einem Push schon der neue Stand geladen ist. Ablesen mit
    `git rev-list --count HEAD` (+1 für den Commit, der gerade entsteht). */
-var APP_VERSION = "v37";
+var APP_VERSION = "v38";
 
 async function boot() {
   var vb = $("verBadge");
