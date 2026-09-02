@@ -330,27 +330,49 @@ textarea { min-height: 120px; font-family: monospace; font-size: 12px; line-heig
 }
 
 /* Abschnittsüberschrift aus Symbol und Wort */
-/* Abschnittskopf als gefuellte Marke statt duenner Beschriftung. Bewusst NICHT
-   in Bernstein: das gehoert dem laufenden Titel (Bernstein-Regel, DESIGN.md).
-   Kraft kommt aus Flaeche, Rahmen und Gewicht, das Symbol traegt die Farbe. */
-.sec-head { padding: 16px 14px 10px 14px; }
+/* Abschnittskopf nach Entwurf A5: eine graue Formmarke traegt die ART
+   (eckig = Geschichte, rund mit Loch = Musik), daneben das Wort und dahinter
+   eine durchlaufende Linie. Die Marke ist gezeichnet, keine Symbolschrift.
+   Grau und bewusst NICHT in Bernstein: das gehoert dem laufenden Titel
+   (Bernstein-Regel, DESIGN.md). So mischen sich Art und Zustand nie. */
+.sec-head { display: flex; align-items: center; padding: 20px 14px 12px 14px; }
 .sec-head .mark {
   display: inline-flex;
   align-items: center;
+  flex: 0 0 auto;
   min-height: 44px;
-  padding: 8px 20px 8px 14px;
-  border: 2px solid var(--border);
-  border-radius: 999px;
-  background: var(--surface-2);
-  color: var(--text);
-  font-size: 19px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 24px;
   font-weight: 700;
+  letter-spacing: -0.01em;
 }
 .sec-head .sym {
-  display: inline-flex;
-  margin-right: 10px;
-  line-height: 1;
-  color: var(--accent);
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 30px; height: 30px;
+  margin-right: 14px;
+  border-radius: 7px;
+  background: var(--text-dim);
+}
+/* Musik ist rund und traegt das Loch der Schallplatte. */
+.sec-head .sym.musik { position: relative; border-radius: 50%; }
+.sec-head .sym.musik::after {
+  content: "";
+  position: absolute;
+  left: 11px; top: 11px;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--bg);
+}
+.sec-head .sec-line {
+  flex: 1 1 auto;
+  height: 4px;
+  margin-left: 16px;
+  border-radius: 2px;
+  background: var(--border);
 }
 
 /* Kachelraster */
@@ -361,6 +383,9 @@ textarea { min-height: 120px; font-family: monospace; font-size: 12px; line-heig
   gap: 12px;
   padding: 0 14px 8px 14px;
 }
+/* Kachel nach Entwurf A5: eine randlose KARTE aus quadratischem Cover und
+   Kapitel-Streifen, DARUNTER und ausserhalb der Karte der Name. Der Rahmen um
+   alles ist weg - die Karte traegt sich ueber Radius und Schatten. */
 .tile {
   position: relative;
   display: block;
@@ -372,16 +397,18 @@ textarea { min-height: 120px; font-family: monospace; font-size: 12px; line-heig
   color: var(--text);
   cursor: pointer;
 }
-/* Die Kachel ist eine Karte: Bild oben, Titel im Fuss. Der laufende Titel
-   faerbt die ganze Karte – ein Rahmen allein war aus zwei Metern Entfernung
-   nicht zu erkennen. */
-.tile {
+/* Der Stapel umschliesst NUR die Karte. So messen sich die Ebenen einer
+   Sammlung an der Karte und laufen nicht ueber den Namen darunter. */
+.tile .stapel { position: relative; display: block; }
+.tile .karte {
+  position: relative;
+  z-index: 2;
+  display: block;
   border-radius: 16px;
   overflow: hidden;
   background: var(--surface);
-  border: 3px solid var(--border);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
 }
-.tile.is-playing { background: var(--accent); border-color: var(--accent); }
 .tile .box {
   position: relative;
   width: 100%;
@@ -395,46 +422,138 @@ textarea { min-height: 120px; font-family: monospace; font-size: 12px; line-heig
   width: 100%; height: 100%;
   display: block;
 }
+/* Streifen unter dem Cover: gezeichnete Listenmarke und die Anzahl. Sagt vor
+   dem Antippen, wie viel hinter der Kachel liegt. */
+.tile .strip {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: 52px;
+  padding: 0 10px;
+  background: var(--surface-2);
+}
+.tile .strip .lm { flex: 0 0 auto; margin-right: 10px; }
+.tile .strip .lm i {
+  display: block;
+  width: 22px; height: 4px;
+  border-radius: 2px;
+  background: var(--hint);
+}
+.tile .strip .lm i + i { margin-top: 5px; }
+.tile .strip .cnt {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--hint);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+/* Der Name steht unter der Karte und einzeilig. So bleibt die Reihe der Cover
+   auf einer Linie, auch wenn die Namen verschieden lang sind. */
 .tile .cap {
   display: block;
-  padding: 9px 12px 11px 12px;
-  font-size: 15px;
-  font-weight: 600;
-  line-height: 1.2;
-  color: var(--text);
-  max-height: 46px;
+  margin-top: 9px;
+  padding: 0 2px;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.25;
+  color: var(--text-dim);
   overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.tile.is-playing .cap { color: var(--on-accent); }
 
-/* Ordner erkennt man an der Lasche über dem Bild */
-/* Die Lasche war bernsteinfarben und sagte damit dasselbe wie der laufende
-   Titel. Jetzt ein dunkler Chip: erkennbar, ohne die Bedeutung zu doppeln. */
-.tile .folder-tab {
-  position: absolute;
-  top: 0; left: 0;
-  display: inline-flex;
-  align-items: center;
-  padding: 6px 14px 7px 12px;
-  background: var(--surface-2);
-  color: var(--text);
-  font-size: 13px;
-  font-weight: 700;
-  border-bottom-right-radius: 16px;
-  z-index: 2;
+/* Laeuft gerade (E4): Ring UND Abzeichen. Ein Rahmen allein war aus zwei
+   Metern Entfernung nicht zu erkennen - deshalb zwei Kanaele statt einem. */
+.tile.is-playing .karte {
+  box-shadow: 0 0 0 6px var(--accent), 0 10px 26px rgba(255, 209, 102, 0.24);
 }
-.tile .folder-tab svg { margin-right: 6px; }
+.tile.is-playing .cap { color: var(--text); }
+.tile .eq {
+  position: absolute;
+  left: 10px; top: 10px;
+  z-index: 4;
+  height: 30px;
+  padding: 0 10px 8px 10px;
+  border-radius: 15px;
+  background: var(--accent);
+  display: none;
+  align-items: flex-end;
+}
+.tile.is-playing .eq { display: flex; }
+.tile .eq i {
+  display: block;
+  width: 4px;
+  margin-left: 3px;
+  border-radius: 2px;
+  background: var(--on-accent);
+  -webkit-animation: hbeq 0.9s ease-in-out infinite alternate;
+  animation: hbeq 0.9s ease-in-out infinite alternate;
+}
+.tile .eq i:first-child { margin-left: 0; }
+.tile .eq i:nth-child(1) { height: 9px; }
+.tile .eq i:nth-child(2) { height: 17px; -webkit-animation-delay: 0.18s; animation-delay: 0.18s; }
+.tile .eq i:nth-child(3) { height: 12px; -webkit-animation-delay: 0.36s; animation-delay: 0.36s; }
+@-webkit-keyframes hbeq { from { -webkit-transform: scaleY(0.4); } to { -webkit-transform: scaleY(1); } }
+@keyframes hbeq { from { transform: scaleY(0.4); } to { transform: scaleY(1); } }
+@media (prefers-reduced-motion: reduce) {
+  .tile .eq i { -webkit-animation: none; animation: none; }
+}
+
+/* Sammlung: zwei versetzte Ebenen hinter der Karte. Der Versatz bleibt klein
+   genug, dass er in den Spaltenabstand passt und keine Nachbarkachel trifft. */
+.tile .lage {
+  position: absolute;
+  left: 5px; top: 5px; right: -5px;
+  height: 100%;
+  border-radius: 16px;
+  background: var(--surface-2);
+  z-index: 1;
+}
+.tile .lage.l2 {
+  left: 10px; top: 10px; right: -10px;
+  background: var(--surface);
+  z-index: 0;
+}
+
+/* Musik ist eine runde Scheibe, Geschichte ein Quadrat (Art durch FORM).
+   Die Scheibe ist etwas kleiner als ein Cover und in ihrer Spalte zentriert;
+   die Spaltenbreite bleibt, damit die Ordnung des Rasters haelt. */
+.tile.music .stapel { width: 82%; margin: 0 auto; }
+.tile.music .karte { border-radius: 50%; background: transparent; box-shadow: none; }
+.tile.music .box { border-radius: 50%; }
+.tile.music.is-playing .karte {
+  box-shadow: 0 0 0 6px var(--accent), 0 10px 26px rgba(255, 209, 102, 0.24);
+}
+.tile.music .cap { text-align: center; }
+/* Die Lieblingsliste traegt dasselbe Zeichen wie das Herz an jedem Lied. */
+.tile.music .fav-disc {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface);
+  box-shadow: inset 0 0 0 6px var(--fav);
+  color: var(--fav);
+}
+
 
 /* Kleiner Listen-Knopf oben rechts auf Album-Kacheln (§5.3) */
+/* Listen-Knopf als Chip in der oberen rechten Ecke des Covers - dieselbe
+   Stelle wie bisher, damit niemand sie neu suchen muss. Er liegt UEBER dem
+   Cover und laesst dem Streifen darunter die volle Breite fuer die Anzahl.
+   Trefferflaeche unveraendert 44 px. */
 .tile .list-btn {
   position: absolute;
   top: 0; right: 0;
+  z-index: 5;
   width: 44px; height: 44px;
   border: 0;
   padding: 0;
   background: transparent;
   cursor: pointer;
-  z-index: 3;
 }
 .tile .list-btn span {
   position: absolute;
@@ -473,9 +592,11 @@ textarea { min-height: 120px; font-family: monospace; font-size: 12px; line-heig
 .tile.is-playing .hoer { background: rgba(42, 29, 0, 0.28); }
 .tile.is-playing .hoer i { background: var(--on-accent); }
 
-/* Kapitel-Kacheln: große Ziffer statt Cover (§5.2, Ziffer vergrößert) */
-.tile.chapter .box { background: var(--surface); border-color: var(--border); }
-.tile.chapter.is-playing .box { border-color: var(--accent); }
+/* Kapitel-Kacheln: grosse Ziffer statt Cover. Sie tragen keinen Streifen und
+   keinen Namen - die Ziffer IST der Name. Ring und Abzeichen fuer "laeuft
+   gerade" kommen wie bei jeder anderen Karte von .tile.is-playing .karte. */
+.tile.chapter .karte { background: var(--surface); }
+.tile.chapter .box { background: var(--surface); }
 .tile .num {
   position: absolute;
   top: 0; left: 0; right: 0; bottom: 0;
@@ -498,15 +619,6 @@ textarea { min-height: 120px; font-family: monospace; font-size: 12px; line-heig
 
 /* Zeilenliste für Musik */
 .rows { padding: 0 14px 8px 14px; }
-/* Zwei Zeilen nebeneinander – nur auf Ebene 1. In der Titelliste bleibt es
-   einspaltig: Bei zwei Spalten waere fuer ein Kind nicht mehr klar, ob die
-   Reihenfolge nach rechts oder nach unten laeuft. */
-.rows.two {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-gap: 10px;
-  gap: 10px;
-}
 .row-item {
   display: flex;
   align-items: center;
@@ -521,8 +633,8 @@ textarea { min-height: 120px; font-family: monospace; font-size: 12px; line-heig
   text-align: left;
   cursor: pointer;
 }
-.rows:not(.two) .row-item { margin-bottom: 10px; }
-.rows:not(.two) .row-item:last-child { margin-bottom: 0; }
+.rows .row-item { margin-bottom: 10px; }
+.rows .row-item:last-child { margin-bottom: 0; }
 .row-item.is-playing { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 .row-item.is-playing .rd { color: var(--on-accent); }
 .row-item.is-playing .fav-btn { color: var(--on-accent); }
@@ -549,18 +661,6 @@ textarea { min-height: 120px; font-family: monospace; font-size: 12px; line-heig
   color: var(--text);
 }
 .row-item .row-list-btn svg { position: absolute; top: 6px; left: 6px; }
-/* Herz-Kachel der Lieblingszeile: steht an der Stelle des Covers. */
-.row-item .fav-tile {
-  width: 58px; height: 58px;
-  flex: 0 0 auto;
-  margin-right: 14px;
-  border-radius: 12px;
-  background: var(--surface-2);
-  color: var(--fav);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
 /* Herz je Titelzeile. Farbe bewusst nicht Bernstein – siehe DESIGN.md. */
 .row-item .fav-btn {
   flex: 0 0 auto;
@@ -607,29 +707,31 @@ textarea { min-height: 120px; font-family: monospace; font-size: 12px; line-heig
 /* ============================================================
    Player-Leiste  (Spec §5.4)
    ============================================================ */
-body.has-player #screenKid { padding-bottom: 150px; }
+body.has-player #screenKid { padding-bottom: 134px; }
 
+/* Entwurf A5: die Leiste klebt buendig am unteren Rand und ist EINE Zeile -
+   Cover, Name mit Fortschritt, Zeiten, Tasten. Vorher lagen Fortschritt,
+   Tasten und Name in drei Zeilen uebereinander und die Leiste war hoch. */
 #player {
   position: fixed;
   left: 0; right: 0; bottom: 0;
   z-index: 40;
+  height: 116px;
+  display: none;
+  align-items: center;
   background: var(--surface-2);
   border-top: 3px solid var(--accent);
-  padding: 8px 12px 10px 12px;
-  display: none;
+  padding: 0 12px;
 }
-#player.is-on { display: block; }
-
-/* Knopfblock mittig, das runde Cover sitzt mittendrin. */
-.p-main { display: flex; align-items: center; justify-content: center; margin-top: 8px; }
+#player.is-on { display: flex; }
 
 .p-cover {
-  width: 56px; height: 56px;
+  width: 72px; height: 72px;
   flex: 0 0 auto;
   border-radius: 50%;
   overflow: hidden;
   background: var(--surface-2);
-  margin: 0 10px;
+  margin: 0 14px 0 0;
 }
 .p-cover img { width: 100%; height: 100%; display: block; }
 
@@ -637,7 +739,7 @@ body.has-player #screenKid { padding-bottom: 150px; }
 @keyframes hbspin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 /* Die Drehung liegt auf dem Kreis, NICHT auf dem Bild. Ein animiertes <img>
    behaelt in der Android-WebView seine alte Textur, wenn man mitten in der
-   Animation die Quelle tauscht – das Cover blieb dann bis zur naechsten Pause
+   Animation die Quelle tauscht - das Cover blieb dann bis zur naechsten Pause
    unsichtbar. Der Kreis ist rund, optisch ist die Drehung identisch. */
 .p-cover.spin {
   -webkit-animation: hbspin 9s linear infinite;
@@ -647,18 +749,32 @@ body.has-player #screenKid { padding-bottom: 150px; }
   .p-cover.spin { -webkit-animation: none; animation: none; }
 }
 
-/* Der Titel steht unter den Knoepfen und klein: Das Kind kann ihn nicht lesen,
-   fuer den Vater genuegt ein Blick. */
+/* Name und Fortschritt teilen sich die Mitte und nehmen, was uebrig ist. */
+.p-info { flex: 1 1 auto; min-width: 0; }
+
+/* Der Titel steht jetzt neben statt unter den Knoepfen und darf groesser
+   sein. Lesen muss ihn das Kind weiterhin nicht - fuer den Vater genuegt
+   ein Blick, und der faellt in einer Zeile leichter. */
 .p-title {
-  margin-top: 6px;
-  font-size: 14px;
+  font-size: 17px;
+  font-weight: 600;
   line-height: 1.25;
-  text-align: center;
-  color: var(--text-dim);
+  color: var(--text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.p-time {
+  flex: 0 0 auto;
+  margin: 0 14px 0 12px;
+  text-align: right;
+  font-size: 14px;
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-dim);
+}
+.p-time em { display: block; font-style: normal; color: var(--hint); }
 
 .p-btns { flex: 0 0 auto; display: flex; align-items: center; }
 .p-btn {
@@ -692,28 +808,19 @@ body.has-player #screenKid { padding-bottom: 150px; }
    Ueberspringen, das behoben werden soll. */
 .p-btn.is-busy { opacity: 0.45; }
 
-/* Fortschrittszeile: verstrichene Zeit, Balken, Restzeit. */
-.p-prog { display: flex; align-items: center; }
-.p-prog .t {
-  flex: 0 0 auto;
-  min-width: 44px;
-  font-size: 13px;
-  font-variant-numeric: tabular-nums;
-  color: var(--hint);
-}
-.p-prog .t:last-child { text-align: right; }
+/* Fortschritt als reine Anzeige unter dem Namen. Die Zeiten sind daraus
+   herausgewandert und stehen rechts (siehe .p-time). */
+.p-prog { margin-top: 8px; }
 .p-prog .track {
-  flex: 1 1 auto;
-  height: 6px;
-  margin: 0 10px;
-  border-radius: 3px;
+  height: 8px;
+  border-radius: 4px;
   background: var(--border);
   overflow: hidden;
 }
 .p-prog .fill {
   height: 100%;
   width: 0%;
-  border-radius: 3px;
+  border-radius: 4px;
   background: var(--accent);
 }
 /* Schieberegler. Die Gestaltung hing frueher allein an #pVol; seit der
@@ -1445,38 +1552,38 @@ body.has-player #screenKid { padding-bottom: 150px; }
 </section>
 
 <div id="player">
-  <!-- Fortschritt zuoberst: die erste Frage beim Blick auf die Leiste ist,
-       wie weit das Lied ist. -->
-  <div class="p-prog">
-    <span class="t" id="pElapsed">0:00</span>
-    <div class="track"><div class="fill" id="pFill"></div></div>
-    <span class="t" id="pRemain">0:00</span>
+  <!-- Cover links, wie im Entwurf A5. Es bleibt rund und dreht sich weiter:
+       die Drehung sagt "es laeuft gerade" und ist an einem Quadrat nicht zu
+       haben. Ein Tipp darauf zeigt weiterhin den grossen Player (Punkt AH). -->
+  <div class="p-cover" id="pCover"><img id="pImg" alt=""></div>
+  <div class="p-info">
+    <div class="p-title" id="pTitle"></div>
+    <div class="p-prog"><div class="track"><div class="fill" id="pFill"></div></div></div>
   </div>
-  <div class="p-main">
-    <div class="p-btns">
-      <!-- Herz zuerst und damit am weitesten vom grossen Play-Knopf entfernt:
-           ein Fehlgriff soll nicht die Wiedergabe umschalten. Der Platz bleibt
-           auch bei Hoerspielen reserviert, sonst wandern die Knoepfe. -->
-      <button class="p-btn fav" id="pFav" title="Lieblingssong"></button>
-      <button class="p-btn" id="pPrev" title="Vorheriger">
-        <svg width="33" height="33" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M7 6h2v12H7z"/><path d="M19 6v12l-9-6z"/>
-        </svg>
-      </button>
-      <div class="p-cover" id="pCover"><img id="pImg" alt=""></div>
-      <button class="p-btn big" id="pPlay" title="Wiedergabe">
-        <svg width="34" height="34" viewBox="0 0 24 24" fill="currentColor" id="pPlayIcon">
-          <path d="M7 5v14l12-7z"/>
-        </svg>
-      </button>
-      <button class="p-btn" id="pNext" title="Nächster">
-        <svg width="33" height="33" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M15 6h2v12h-2z"/><path d="M5 6v12l9-6z"/>
-        </svg>
-      </button>
-    </div>
+  <!-- Verstrichen oben, Rest darunter. Feste Ziffernbreite, damit beim
+       Weiterzaehlen nichts springt. -->
+  <div class="p-time"><span class="t" id="pElapsed">0:00</span><em class="t" id="pRemain">0:00</em></div>
+  <div class="p-btns">
+    <!-- Herz zuerst und damit am weitesten vom grossen Play-Knopf entfernt:
+         ein Fehlgriff soll nicht die Wiedergabe umschalten. Der Platz bleibt
+         auch bei Hoerspielen reserviert, sonst wandern die Knoepfe. -->
+    <button class="p-btn fav" id="pFav" title="Lieblingssong"></button>
+    <button class="p-btn" id="pPrev" title="Vorheriger">
+      <svg width="33" height="33" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M7 6h2v12H7z"/><path d="M19 6v12l-9-6z"/>
+      </svg>
+    </button>
+    <button class="p-btn big" id="pPlay" title="Wiedergabe">
+      <svg width="34" height="34" viewBox="0 0 24 24" fill="currentColor" id="pPlayIcon">
+        <path d="M7 5v14l12-7z"/>
+      </svg>
+    </button>
+    <button class="p-btn" id="pNext" title="Nächster">
+      <svg width="33" height="33" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M15 6h2v12h-2z"/><path d="M5 6v12l9-6z"/>
+      </svg>
+    </button>
   </div>
-  <div class="p-title" id="pTitle"></div>
 </div>
 
 <!-- Großer Player (Punkt AH) -->
@@ -5249,13 +5356,10 @@ var View = { stack: [] };   // [{kind:"folder"|"album"|"playlist", id, name}]
 
 var SVG_BACK = '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 19l-7-7 7-7"/></svg>';
 var SVG_LIST = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></svg>';
-var SVG_FOLDER = '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>';
-var SVG_STORY = '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h6a2 2 0 0 1 2 2v13a2 2 0 0 0-2-2H4z"/><path d="M20 4h-6a2 2 0 0 0-2 2v13a2 2 0 0 1 2-2h6z"/></svg>';
 var SVG_HEART = '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20s-7-4.6-7-9.4A3.9 3.9 0 0 1 12 8a3.9 3.9 0 0 1 7 2.6C19 15.4 12 20 12 20z"/></svg>';
 var SVG_HEART_FULL = '<svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M12 20s-7-4.6-7-9.4A3.9 3.9 0 0 1 12 8a3.9 3.9 0 0 1 7 2.6C19 15.4 12 20 12 20z"/></svg>';
 var SVG_HEART_BIG = '<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20s-7-4.6-7-9.4A3.9 3.9 0 0 1 12 8a3.9 3.9 0 0 1 7 2.6C19 15.4 12 20 12 20z"/></svg>';
 var SVG_HEART_BIG_FULL = '<svg width="34" height="34" viewBox="0 0 24 24" fill="currentColor"><path d="M12 20s-7-4.6-7-9.4A3.9 3.9 0 0 1 12 8a3.9 3.9 0 0 1 7 2.6C19 15.4 12 20 12 20z"/></svg>';
-var SVG_MUSIC = '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l10-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="16" cy="16" r="3"/></svg>';
 
 function fmtDur(ms) {
   var s = Math.round((ms || 0) / 1000);
@@ -5455,6 +5559,20 @@ function level1Items() {
    sprünge beim ersten Merker um sieben Pixel. */
 function hoerHtml() { return '<div class="hoer is-empty"><i></i></div>'; }
 
+/* Gezeichnete Listenmarke im Streifen (keine Symbolschrift noetig). */
+var LIST_MARK = '<span class="lm" aria-hidden="true"><i></i><i></i><i></i></span>';
+
+/* Das Abzeichen fuer "laeuft gerade" wird - wie der Hoerstandsbalken - IMMER
+   mitgebaut und nur per Klasse gezeigt. Sonst muesste markPlayingTiles Knoten
+   nachtraeglich einhaengen, und die Karte spraenge beim Start um. */
+function eqHtml() { return '<div class="eq" aria-hidden="true"><i></i><i></i><i></i></div>'; }
+
+/* "12 Kapitel" / "1 Kapitel" / "9 Folgen". Ohne Anzahl bleibt der Streifen weg. */
+function anzahlText(n, ein, viele) {
+  if (!n || n < 1) return "";
+  return n + " " + (n === 1 ? ein : viele);
+}
+
 function coverHtml(url) {
   return url ? '<img src="' + esc(url) + '" alt="" loading="lazy" decoding="async">' : "";
 }
@@ -5476,26 +5594,40 @@ function gridStyle() {
 function tileHtml(item) {
   var cls = "tile tap";
   var inner = coverHtml(item.cover);
-  var extra = "";
-  var action;
+  var action = "";
+  var lagen = "";
+  var listBtn = "";
+  var anzahl = "";
   if (item.kind === "folder") {
     action = ' data-open="folder" data-id="' + esc(item.id) + '"';
-    extra = '<div class="folder-tab">' + SVG_FOLDER +
-            ((item.albumIds && item.albumIds.length) || "") + '</div>';
+    // Sammlung: zwei versetzte Ebenen hinter der Karte statt der Lasche. Die
+    // Form sagt "da ist mehr dahinter", die Zahl im Streifen sagt wie viel.
+    lagen = '<div class="lage l2"></div><div class="lage"></div>';
+    anzahl = anzahlText((item.albumIds && item.albumIds.length) || 0, "Folge", "Folgen");
   } else if (item.kind === "album") {
     action = ' data-play="album" data-id="' + esc(item.id) + '" data-hoer="' + esc(item.id) + '"';
     // Eine Podcast-Folge ist ein Album mit genau einem Titel. Der Listen-Knopf
-    // führte dort in eine Kapitelliste mit einem einzigen Eintrag – ein Ziel,
-    // das nichts erklärt und nur den Weg zurück kostet.
+    // fuehrte dort in eine Kapitelliste mit einem einzigen Eintrag - ein Ziel,
+    // das nichts erklaert und nur den Weg zurueck kostet.
     var al = albumById(item.id);
-    if (!al || al.tracks.length > 1) {
-      extra = '<button class="list-btn" data-open="album" data-id="' + esc(item.id) + '"><span>' + SVG_LIST + '</span></button>';
+    var anz = al ? al.tracks.length : 0;
+    if (!al || anz > 1) {
+      listBtn = '<button class="list-btn" data-open="album" data-id="' + esc(item.id) + '"><span>' + SVG_LIST + '</span></button>';
     }
+    anzahl = anzahlText(anz, "Kapitel", "Kapitel");
   }
   return '<div class="' + cls + '"' + action + '>' +
-           extra +
-           '<div class="box">' + inner +
-             (item.kind === "album" ? hoerHtml() : "") +
+           '<div class="stapel">' + lagen +
+             '<div class="karte">' +
+               '<div class="box">' + inner + eqHtml() +
+                 (item.kind === "album" ? hoerHtml() : "") +
+               '</div>' +
+               (anzahl
+                 ? '<div class="strip">' + LIST_MARK +
+                     '<span class="cnt">' + anzahl + '</span>' +
+                   '</div>'
+                 : "") +
+             '</div>' + listBtn +
            '</div>' +
            '<span class="cap">' + esc(item.name) + '</span>' +
          '</div>';
@@ -5508,10 +5640,12 @@ function chapterTileHtml(albumId, track, shownIndex, realPos) {
   return '<div class="tile chapter tap" data-play="track" data-id="' + esc(albumId) +
          '" data-pos="' + realPos + '" data-uri="' + esc(track.uri) +
          '" data-hoer="' + esc(albumId) + '" data-hoerpos="' + realPos + '">' +
-           '<div class="box"><div class="num">' +
-             '<span class="n">' + (shownIndex + 1) + '</span>' +
-             '<span class="d">' + fmtDur(track.ms) + '</span>' +
-           '</div>' + hoerHtml() + '</div>' +
+           '<div class="stapel"><div class="karte">' +
+             '<div class="box"><div class="num">' +
+               '<span class="n">' + (shownIndex + 1) + '</span>' +
+               '<span class="d">' + fmtDur(track.ms) + '</span>' +
+             '</div>' + eqHtml() + hoerHtml() + '</div>' +
+           '</div></div>' +
          '</div>';
 }
 
@@ -5524,14 +5658,37 @@ function rowHtml(opts) {
          '</div>';
 }
 
-/* `pups` macht die Marke antippbar. Nur die Musikzeile bekommt das – die
-   Geschichten-Marke bleibt eine reine Beschriftung. */
-function sectionHead(svg, word, pups) {
-  return '<div class="sec-head"><span class="mark' + (pups ? " tap" : "") + '"' +
-           (pups ? ' data-pups="1"' : "") + '><span class="sym">' + svg +
-         '</span>' + word + '</span></div>';
+/* Musik ist eine runde Scheibe (Art durch FORM, nicht durch Farbe). Sie
+   traegt keinen Streifen und keinen Hoerstand - der gehoert den Geschichten.
+   Der Listen-Knopf sitzt als Chip an der Scheibe und behaelt sein data-open,
+   damit der Weg in die Titelliste derselbe bleibt wie vorher. */
+function musicTileHtml(o) {
+  var innen = o.fav
+    ? '<div class="fav-disc">' + SVG_HEART_FULL + '</div>'
+    : coverHtml(o.cover);
+  return '<div class="tile tap music"' + o.action + '>' +
+           '<div class="stapel">' +
+             '<div class="karte"><div class="box">' + innen + eqHtml() + '</div></div>' +
+             '<button class="list-btn" data-open="playlist" data-id="' + esc(o.listId) +
+               '"><span>' + SVG_LIST + '</span></button>' +
+           '</div>' +
+           '<span class="cap">' + esc(o.name) + '</span>' +
+         '</div>';
 }
 
+/* `pups` macht die Marke antippbar. Nur die Musikzeile bekommt das - die
+   Geschichten-Marke bleibt eine reine Beschriftung.
+   `art` ist 'musik' oder 'geschichten' und entscheidet ueber die FORM der
+   Marke (rund mit Loch oder eckig), nicht ueber ihre Farbe. */
+function sectionHead(art, word, pups) {
+  return '<div class="sec-head">' +
+           '<span class="mark' + (pups ? " tap" : "") + '"' +
+             (pups ? ' data-pups="1"' : "") + '>' +
+             '<span class="sym ' + art + '" aria-hidden="true"></span>' + word +
+           '</span>' +
+           '<span class="sec-line" aria-hidden="true"></span>' +
+         '</div>';
+}
 function emptyHtml(text) {
   return '<div class="empty"><div class="sym">🎧</div><p>' + text + '</p></div>';
 }
@@ -5552,31 +5709,28 @@ function renderLevel1() {
   // hat: eine leere Kachel waere fuer das Kind eine Sackgasse.
   var favs = visibleTracks(favList());
   if (favs.length || music.length) {
-    html += sectionHead(SVG_MUSIC, "Musik", true) + '<div class="rows two">';
+    html += sectionHead("musik", "Musik", true) + '<div class="grid"' + gridStyle() + '>';
     if (favs.length) {
-      html += rowHtml({
+      html += musicTileHtml({
         action: ' data-play="favall" data-id="' + FAV_ID + '"',
-        cover: null, name: "Lieblingssongs", dur: "",
-        pre: '<div class="fav-tile">' + SVG_HEART_FULL + '</div>',
-        btn: '<button class="row-list-btn" data-open="playlist" data-id="' + FAV_ID +
-             '"><span>' + SVG_LIST + '</span></button>'
+        name: "Lieblingssongs", cover: null, fav: true,
+        listId: FAV_ID
       });
     }
     for (var m = 0; m < music.length; m++) {   /* eslint-disable-line */
-      // §6.2 sieht den Fall „Musik-Playlist ganz" vor: Antippen startet sie.
-      // Der Knopf rechts führt weiter in die Titelliste – ohne ihn wäre Ebene 3
-      // aus §5.2 für das Kind unerreichbar.
-      html += rowHtml({
+      // 6.2 sieht den Fall "Musik-Playlist ganz" vor: Antippen startet sie.
+      // Der Knopf an der Scheibe fuehrt weiter in die Titelliste - ohne ihn
+      // waere Ebene 3 aus 5.2 fuer das Kind unerreichbar.
+      html += musicTileHtml({
         action: ' data-play="playlistall" data-id="' + esc(music[m].id) + '"',
-        cover: music[m].cover, name: music[m].name, dur: "",
-        btn: '<button class="row-list-btn" data-open="playlist" data-id="' +
-             esc(music[m].id) + '"><span>' + SVG_LIST + '</span></button>'
+        name: music[m].name, cover: music[m].cover, fav: false,
+        listId: music[m].id
       });
     }
     html += "</div>";
   }
   if (stories.length) {
-    html += sectionHead(SVG_STORY, "Geschichten") + '<div class="grid"' + gridStyle() + '>';
+    html += sectionHead("geschichten", "Geschichten") + '<div class="grid"' + gridStyle() + '>';
     for (var s = 0; s < stories.length; s++) html += tileHtml(stories[s]);
     html += "</div>";
   }
@@ -6938,7 +7092,7 @@ async function copyLog(statusId) {
    Zahl an, die nichts mehr bedeutet – und genau dafür ist sie da: erkennen,
    ob nach einem Push schon der neue Stand geladen ist. Ablesen mit
    `git rev-list --count HEAD` (+1 für den Commit, der gerade entsteht). */
-var APP_VERSION = "v41";
+var APP_VERSION = "v42";
 
 async function boot() {
   var vb = $("verBadge");
