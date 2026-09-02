@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <meta name="color-scheme" content="dark">
-<meta name="theme-color" content="#151A24">
+<meta name="theme-color" content="#0A120D">
 <title>Hörbox</title>
 <style>
 /* ============================================================
@@ -12,22 +12,22 @@
    Kein CSS-Nesting, kein :has() – Chrome 106 / Android-WebView.
    ============================================================ */
 :root {
-  --bg:        #151A24;
-  --surface:   #202836;
-  --surface-2: #2C3648;
-  --border:    #33405A;
-  --accent:    #F5C24B;
-  --on-accent: #412402;
-  --text:      #E8ECF3;
-  --text-dim:  #C7CDD9;
-  --hint:      #8D97AB;
+  --bg:        #0A120D;
+  --surface:   #141F18;
+  --surface-2: #1F2F25;
+  --border:    #354D3C;
+  --accent:    #FFD166;
+  --on-accent: #2A1D00;
+  --text:      #E8F1EA;
+  --text-dim:  #BCD0C0;
+  --hint:      #88A090;
   --danger:    #E2725B;
   /* Eigener Rotton nur fuer das Herz. Bewusst NICHT --danger: das ist laut
      Zwei-Signale-Regel Fehlerfarbe, und ein gemerktes Lied ist kein Fehler.
      Deutlich kraeftiger und roter als das gedaempfte --danger, damit die
      beiden nie verwechselt werden. */
   --fav:       #FF4D6D;
-  --ok:        #7BC47F;
+  --ok:        #2FD6A3;
   --radius-tile: 10px;
   --radius-surface: 12px;
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -150,7 +150,7 @@ textarea { min-height: 120px; font-family: monospace; font-size: 12px; line-heig
   background: var(--surface-2);
   color: var(--text-dim);
 }
-.badge.ok  { background: #1E3A24; color: var(--ok); }
+.badge.ok  { background: #14332A; color: var(--ok); }
 .badge.err { background: #3A211E; color: var(--danger); }
 
 /* ============================================================
@@ -455,7 +455,7 @@ textarea { min-height: 120px; font-family: monospace; font-size: 12px; line-heig
   position: absolute;
   left: 0; right: 0; bottom: 0;
   height: 7px;
-  background: rgba(21, 26, 36, 0.6);
+  background: rgba(10, 18, 13, 0.6);
   z-index: 2;
 }
 .tile .hoer.is-empty { display: none; }
@@ -470,7 +470,7 @@ textarea { min-height: 120px; font-family: monospace; font-size: 12px; line-heig
 .tile .hoer.is-full i { background: var(--text); }
 /* Auf der laufenden (bernsteinfarbenen) Karte braucht der Balken den
    Gegenton, sonst verschwindet Hellgrau in Bernstein. */
-.tile.is-playing .hoer { background: rgba(65, 36, 2, 0.28); }
+.tile.is-playing .hoer { background: rgba(42, 29, 0, 0.28); }
 .tile.is-playing .hoer i { background: var(--on-accent); }
 
 /* Kapitel-Kacheln: große Ziffer statt Cover (§5.2, Ziffer vergrößert) */
@@ -950,7 +950,7 @@ body.has-player #screenKid { padding-bottom: 150px; }
 #askOverlay {
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(21, 26, 36, 0.93);
+  background: rgba(10, 18, 13, 0.93);
   z-index: 70;
   display: none;
   text-align: center;
@@ -992,7 +992,7 @@ body.has-player #screenKid { padding-bottom: 150px; }
 #errOverlay {
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(21, 26, 36, 0.93);
+  background: rgba(10, 18, 13, 0.93);
   z-index: 60;
   display: none;
   text-align: center;
@@ -3682,7 +3682,7 @@ var Wartespiel = (function () {
     ctx.clearRect(0, 0, breite, hoehe);
 
     // Boden: durchgezogene Linie plus mitlaufende Striche als Tempogefühl.
-    ctx.strokeStyle = "#33405A";
+    ctx.strokeStyle = "#354D3C";
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(0, boden + 0.5);
@@ -3702,8 +3702,8 @@ var Wartespiel = (function () {
     // Steine
     for (var i = 0; i < steine.length; i++) {
       var s = steine[i];
-      ctx.fillStyle = "#2C3648";
-      ctx.strokeStyle = "#33405A";
+      ctx.fillStyle = "#1F2F25";
+      ctx.strokeStyle = "#354D3C";
       ctx.lineWidth = 2;
       klotz(s.x, boden - s.h, s.b, s.h, 4);
       ctx.fill();
@@ -3713,7 +3713,7 @@ var Wartespiel = (function () {
     // Figur
     var fussY = boden - y;
     var mitte = fussY - BEIN_LAENGE - FIGUR_R;
-    var farbe = stolpert ? "#E2725B" : "#F5C24B";
+    var farbe = stolpert ? "#E2725B" : "#FFD166";
     var wackel = stolpert ? Math.sin(jetzt / 40) * 2 : 0;
 
     ctx.strokeStyle = farbe;
@@ -3735,8 +3735,8 @@ var Wartespiel = (function () {
     ctx.fill();
 
     // Auge – blickt in Laufrichtung, kneift beim Stolpern zu.
-    ctx.strokeStyle = "#412402";
-    ctx.fillStyle = "#412402";
+    ctx.strokeStyle = "#2A1D00";
+    ctx.fillStyle = "#2A1D00";
     if (stolpert) {
       ctx.lineWidth = 2.5;
       ctx.beginPath();
@@ -3750,7 +3750,7 @@ var Wartespiel = (function () {
     }
 
     // Punktestand
-    ctx.fillStyle = "#8D97AB";
+    ctx.fillStyle = "#88A090";
     ctx.font = "500 16px " + "-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Arial, sans-serif";
     ctx.textAlign = "right";
     ctx.fillText(String(punkte), breite - 20, 34);
@@ -5791,7 +5791,7 @@ function demoData() {
     var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300">' +
       '<rect width="300" height="300" fill="' + HUES[i % HUES.length] + '"/>' +
       '<text x="150" y="196" font-family="sans-serif" font-size="150" font-weight="600" ' +
-      'text-anchor="middle" fill="#151A24">' + label + '</text></svg>';
+      'text-anchor="middle" fill="#0A120D">' + label + '</text></svg>';
     return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
   }
 
@@ -6938,7 +6938,7 @@ async function copyLog(statusId) {
    Zahl an, die nichts mehr bedeutet – und genau dafür ist sie da: erkennen,
    ob nach einem Push schon der neue Stand geladen ist. Ablesen mit
    `git rev-list --count HEAD` (+1 für den Commit, der gerade entsteht). */
-var APP_VERSION = "v40";
+var APP_VERSION = "v41";
 
 async function boot() {
   var vb = $("verBadge");
