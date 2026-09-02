@@ -422,35 +422,9 @@ textarea { min-height: 120px; font-family: monospace; font-size: 12px; line-heig
   width: 100%; height: 100%;
   display: block;
 }
-/* Streifen unter dem Cover: gezeichnete Listenmarke und die Anzahl. Sagt vor
-   dem Antippen, wie viel hinter der Kachel liegt. */
-.tile .strip {
-  position: relative;
-  display: flex;
-  align-items: center;
-  min-height: 52px;
-  padding: 0 10px;
-  background: var(--surface-2);
-}
-.tile .strip .lm { flex: 0 0 auto; margin-right: 10px; }
-.tile .strip .lm i {
-  display: block;
-  width: 22px; height: 4px;
-  border-radius: 2px;
-  background: var(--hint);
-}
-.tile .strip .lm i + i { margin-top: 5px; }
-.tile .strip .cnt {
-  flex: 1 1 auto;
-  min-width: 0;
-  font-size: 13px;
-  color: var(--hint);
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-/* Der Name steht unter der Karte und einzeilig. So bleibt die Reihe der Cover
-   auf einer Linie, auch wenn die Namen verschieden lang sind. */
+/* Nur noch die Musik-Scheiben tragen einen Namen. Geschichten stehen allein
+   ueber ihr Cover - siehe tileHtml. Einzeilig, damit die Reihe der Scheiben
+   auf einer Linie bleibt, auch wenn die Namen verschieden lang sind. */
 .tile .cap {
   display: block;
   margin-top: 9px;
@@ -502,18 +476,21 @@ textarea { min-height: 120px; font-family: monospace; font-size: 12px; line-heig
 }
 
 /* Sammlung: zwei versetzte Ebenen hinter der Karte. Der Versatz bleibt klein
-   genug, dass er in den Spaltenabstand passt und keine Nachbarkachel trifft. */
+   genug, dass er in den Spaltenabstand passt und keine Nachbarkachel trifft -
+   deshalb traegt die Farbe die Erkennbarkeit, nicht die Groesse. Seit die
+   Anzahl im Streifen weg ist, sind die Ebenen das EINZIGE Zeichen fuer eine
+   Sammlung; die obere steht darum auf Kante statt auf Flaeche. */
 .tile .lage {
   position: absolute;
-  left: 5px; top: 5px; right: -5px;
+  left: 6px; top: 6px; right: -6px;
   height: 100%;
   border-radius: 16px;
-  background: var(--surface-2);
+  background: var(--border);
   z-index: 1;
 }
 .tile .lage.l2 {
-  left: 10px; top: 10px; right: -10px;
-  background: var(--surface);
+  left: 11px; top: 11px; right: -11px;
+  background: var(--surface-2);
   z-index: 0;
 }
 
@@ -527,17 +504,25 @@ textarea { min-height: 120px; font-family: monospace; font-size: 12px; line-heig
   box-shadow: 0 0 0 6px var(--accent), 0 10px 26px rgba(255, 209, 102, 0.24);
 }
 .tile.music .cap { text-align: center; }
-/* Die Lieblingsliste traegt dasselbe Zeichen wie das Herz an jedem Lied. */
+/* Die Lieblingsliste IST ein grosses Herz - kein Cover, keine Scheibe, kein
+   Ring. Dasselbe Zeichen wie an jedem Lied, nur so gross, dass es die Kachel
+   fuellt und aus zwei Metern als Erstes auffaellt. */
 .tile.music .fav-disc {
   position: absolute;
   top: 0; left: 0; right: 0; bottom: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--surface);
-  box-shadow: inset 0 0 0 6px var(--fav);
+  background: transparent;
   color: var(--fav);
 }
+.tile.music .fav-disc svg {
+  width: 100%;
+  height: 100%;
+}
+/* Ohne Cover traegt die Scheibe keinen Grund - sonst staende ein dunkler
+   Kreis hinter dem Herz. */
+.tile.music .karte.leer .box { background: transparent; }
 
 
 /* Kleiner Listen-Knopf oben rechts auf Album-Kacheln (§5.3) */
@@ -5559,19 +5544,11 @@ function level1Items() {
    sprünge beim ersten Merker um sieben Pixel. */
 function hoerHtml() { return '<div class="hoer is-empty"><i></i></div>'; }
 
-/* Gezeichnete Listenmarke im Streifen (keine Symbolschrift noetig). */
-var LIST_MARK = '<span class="lm" aria-hidden="true"><i></i><i></i><i></i></span>';
-
 /* Das Abzeichen fuer "laeuft gerade" wird - wie der Hoerstandsbalken - IMMER
    mitgebaut und nur per Klasse gezeigt. Sonst muesste markPlayingTiles Knoten
    nachtraeglich einhaengen, und die Karte spraenge beim Start um. */
 function eqHtml() { return '<div class="eq" aria-hidden="true"><i></i><i></i><i></i></div>'; }
 
-/* "12 Kapitel" / "1 Kapitel" / "9 Folgen". Ohne Anzahl bleibt der Streifen weg. */
-function anzahlText(n, ein, viele) {
-  if (!n || n < 1) return "";
-  return n + " " + (n === 1 ? ein : viele);
-}
 
 function coverHtml(url) {
   return url ? '<img src="' + esc(url) + '" alt="" loading="lazy" decoding="async">' : "";
@@ -5597,39 +5574,32 @@ function tileHtml(item) {
   var action = "";
   var lagen = "";
   var listBtn = "";
-  var anzahl = "";
   if (item.kind === "folder") {
     action = ' data-open="folder" data-id="' + esc(item.id) + '"';
-    // Sammlung: zwei versetzte Ebenen hinter der Karte statt der Lasche. Die
-    // Form sagt "da ist mehr dahinter", die Zahl im Streifen sagt wie viel.
+    // Sammlung: zwei versetzte Ebenen hinter der Karte. Die Form sagt "da ist
+    // mehr dahinter" - das genuegt, eine Zahl dazu liest das Kind ohnehin nicht.
     lagen = '<div class="lage l2"></div><div class="lage"></div>';
-    anzahl = anzahlText((item.albumIds && item.albumIds.length) || 0, "Folge", "Folgen");
   } else if (item.kind === "album") {
     action = ' data-play="album" data-id="' + esc(item.id) + '" data-hoer="' + esc(item.id) + '"';
     // Eine Podcast-Folge ist ein Album mit genau einem Titel. Der Listen-Knopf
     // fuehrte dort in eine Kapitelliste mit einem einzigen Eintrag - ein Ziel,
     // das nichts erklaert und nur den Weg zurueck kostet.
     var al = albumById(item.id);
-    var anz = al ? al.tracks.length : 0;
-    if (!al || anz > 1) {
+    if (!al || al.tracks.length > 1) {
       listBtn = '<button class="list-btn" data-open="album" data-id="' + esc(item.id) + '"><span>' + SVG_LIST + '</span></button>';
     }
-    anzahl = anzahlText(anz, "Kapitel", "Kapitel");
   }
+  // Kein Name und keine Anzahl unter der Kachel: Das Cover steht fuer sich.
+  // Ein Kind, das nicht liest, hatte von beidem nichts, und ohne sie stehen
+  // mehr Cover im Bild. Der Name bleibt im Titel der Ebene und in der Leiste.
   return '<div class="' + cls + '"' + action + '>' +
            '<div class="stapel">' + lagen +
              '<div class="karte">' +
                '<div class="box">' + inner + eqHtml() +
                  (item.kind === "album" ? hoerHtml() : "") +
                '</div>' +
-               (anzahl
-                 ? '<div class="strip">' + LIST_MARK +
-                     '<span class="cnt">' + anzahl + '</span>' +
-                   '</div>'
-                 : "") +
              '</div>' + listBtn +
            '</div>' +
-           '<span class="cap">' + esc(item.name) + '</span>' +
          '</div>';
 }
 
@@ -5668,7 +5638,8 @@ function musicTileHtml(o) {
     : coverHtml(o.cover);
   return '<div class="tile tap music"' + o.action + '>' +
            '<div class="stapel">' +
-             '<div class="karte"><div class="box">' + innen + eqHtml() + '</div></div>' +
+             '<div class="karte' + (o.fav ? ' leer' : '') + '"><div class="box">' +
+               innen + eqHtml() + '</div></div>' +
              '<button class="list-btn" data-open="playlist" data-id="' + esc(o.listId) +
                '"><span>' + SVG_LIST + '</span></button>' +
            '</div>' +
@@ -5681,9 +5652,13 @@ function musicTileHtml(o) {
    `art` ist 'musik' oder 'geschichten' und entscheidet ueber die FORM der
    Marke (rund mit Loch oder eckig), nicht ueber ihre Farbe. */
 function sectionHead(art, word, pups) {
+  // Der Geschichten-Kopf traegt den Admin-Zugang: viermal antippen. Bewusst
+  // ohne sichtbare Rueckmeldung und ohne .tap - wer davon nichts weiss, soll
+  // nichts bemerken. Die PIN dahinter bleibt; die vier Tipps ersetzen nur den
+  // langen Druck in der Bildschirmecke, nicht die Sperre.
   return '<div class="sec-head">' +
            '<span class="mark' + (pups ? " tap" : "") + '"' +
-             (pups ? ' data-pups="1"' : "") + '>' +
+             (pups ? ' data-pups="1"' : ' data-admin="1"') + '>' +
              '<span class="sym ' + art + '" aria-hidden="true"></span>' + word +
            '</span>' +
            '<span class="sec-line" aria-hidden="true"></span>' +
@@ -5869,6 +5844,7 @@ function onKidTap(e) {
   var m = e.target;
   while (m && m !== e.currentTarget) {
     if (m.getAttribute && m.getAttribute("data-pups")) { Pups.los(); return; }
+    if (m.getAttribute && m.getAttribute("data-admin")) { AdminTipp.tipp(); return; }
     m = m.parentNode;
   }
 
@@ -6501,10 +6477,44 @@ var Langdruck = (function () {
   };
 })();
 
-/* --------------------- Admin-Zugang: langer Druck ----------------------- */
+/* ------------- Admin-Zugang: viermal auf "Geschichten" tippen ------------ */
+/* Der lange Druck in der Bildschirmecke war am Tablet kaum zu treffen. Vier
+   Tipps auf den Abschnittskopf sind sicher auszufuehren und trotzdem nichts,
+   was beim Spielen aus Versehen passiert: Der Kopf ist keine Kachel, und wer
+   ihn antippt, bekommt keine Rueckmeldung, die zum Weitertippen einlaedt.
+   Die Zaehlung faellt nach zwei Sekunden Pause zurueck auf null, damit vier
+   ueber den Nachmittag verteilte Tipps nichts oeffnen.
+   Dahinter steht unveraendert die PIN - die vier Tipps ersetzen nur den Weg
+   zum PIN-Feld, nicht die Sperre selbst. */
+var AdminTipp = (function () {
+  var PAUSE_MS = 2000;
+  var NOETIG = 4;
+  var zahl = 0;
+  var letzter = 0;
+
+  function tipp() {
+    var jetzt = Date.now();
+    if (jetzt - letzter > PAUSE_MS) { zahl = 0; }
+    letzter = jetzt;
+    zahl = zahl + 1;
+    if (zahl < NOETIG) { return; }
+    zahl = 0;
+    if (App.demo) { return; }                   // im Demo-Modus nichts oeffnen
+    if (App.screen !== "screenKid") { return; } // nur aus der Kinderansicht
+    Log.info("Admin-Zugang angefordert (vier Tipps auf Geschichten).");
+    openPin();
+  }
+
+  return { tipp: tipp };
+})();
+
+/* ------------- Admin-Zugang: langer Druck in der Ecke (Reserve) ---------- */
 /* Spec §7: unsichtbares Feld 44 × 44 px links oben, drei Sekunden halten.
    Kein Overlay-Element, sondern ein Test auf die Koordinaten – sonst wäre
-   ab Baustufe 2 die Ecke der ersten Kachel tot. */
+   ab Baustufe 2 die Ecke der ersten Kachel tot.
+   Steht seit dem 02.09.2026 nur noch als Reserve daneben: Der übliche Weg
+   sind vier Tipps auf "Geschichten". Am Rechner ist der lange Druck weiter
+   der bequemere Weg, deshalb bleibt er vorerst. */
 (function () {
   var HOLD_MS = 3000;
   var SIZE = 44;
@@ -7092,7 +7102,7 @@ async function copyLog(statusId) {
    Zahl an, die nichts mehr bedeutet – und genau dafür ist sie da: erkennen,
    ob nach einem Push schon der neue Stand geladen ist. Ablesen mit
    `git rev-list --count HEAD` (+1 für den Commit, der gerade entsteht). */
-var APP_VERSION = "v42";
+var APP_VERSION = "v43";
 
 async function boot() {
   var vb = $("verBadge");
